@@ -1,0 +1,43 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "sessions": {
+      "$code": {
+        ".validate": "$code.matches(/^[A-Z]{4}$/)",
+        "meta": {
+          ".read": "auth != null",
+          ".write": "auth != null && !data.exists()",
+          ".validate": "newData.hasChildren(['hostUid', 'createdAt'])",
+          "hostUid": {
+            ".validate": "newData.val() === auth.uid"
+          },
+          "createdAt": {
+            ".validate": "newData.val() === now"
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
+        "members": {
+          ".read": "auth != null",
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && root.child('sessions').child($code).child('meta').exists()",
+            ".validate": "newData.val() === true"
+          }
+        },
+        "nicknames": {
+          ".read": "auth != null && root.child('sessions').child($code).child('meta').child('hostUid').val() === auth.uid",
+          "$uid": {
+            ".read": "auth != null && auth.uid === $uid",
+            ".write": "auth != null && auth.uid === $uid && root.child('sessions').child($code).child('meta').exists()",
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 24"
+          }
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    }
+  }
+}

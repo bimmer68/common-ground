@@ -1,0 +1,70 @@
+/* Projector: dark background, high contrast, readable from 8 metres. */
+body.page-screen {
+  background: #000;
+  color: #fff;
+  font-size: 2vw;
+  overflow: hidden;
+}
+
+.screen {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 4vh 4vw;
+}
+
+.screen-message {
+  font-size: 3vw;
+  text-align: center;
+  max-width: 70vw;
+}
+
+.lobby {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6vw;
+  width: 100%;
+}
+
+.lobby-qr { text-align: center; }
+
+/* White frame around the QR code so phones can read it on a black background. */
+.qr {
+  background: #fff;
+  padding: 2vh;
+  border-radius: 1.5vh;
+  line-height: 0;
+}
+
+.qr img,
+.qr canvas {
+  width: 62vh !important;
+  height: 62vh !important;
+  max-width: 40vw;
+  max-height: 40vw;
+}
+
+.lobby-scan { font-size: 3.2vh; margin: 2vh 0 0; }
+
+.lobby-info { text-align: left; }
+
+.lobby-code {
+  font-size: 22vh;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  line-height: 1;
+  margin: 0;
+}
+
+.lobby-url { font-size: 3.2vh; color: #cfcfcf; margin: 2vh 0 6vh; }
+
+.lobby-count {
+  font-size: 9vh;
+  font-weight: 700;
+  color: #ffd84d;
+  margin: 0;
+}
+
+.page-screen .connection-banner { font-size: 2.5vh; position: fixed; left: 0; right: 0; }

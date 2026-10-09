@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en" data-i18n-title="screen.title">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title></title>
+  <link rel="stylesheet" href="css/app.css">
+  <link rel="stylesheet" href="css/screen.css">
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+</head>
+<body class="page-screen">
+  <main class="screen">
+    <p class="screen-message" id="message" data-i18n="common.loading"></p>
+
+    <section id="lobby" class="lobby" hidden>
+      <div class="lobby-qr">
+        <div id="qr" class="qr"></div>
+        <p class="lobby-scan" data-i18n="screen.scanToJoin"></p>
+      </div>
+      <div class="lobby-info">
+        <p class="lobby-code" id="code"></p>
+        <p class="lobby-url" id="join-url"></p>
+        <p class="lobby-count" id="count"></p>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="js/screen.js"></script>
+</body>
+</html>
