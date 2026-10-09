@@ -41,7 +41,15 @@ Projektor i facilitator su **namjerno odvojeni**: projektor prikazuje laptop, a 
 ## Firebase config
 
 ```js
-// Vlasnik projekta ovdje lijepi svoj firebaseConfig iz Firebase konzole
+const firebaseConfig = {
+  apiKey: "AIzaSyC6Wxdth3BnVjct39t-6o4iIWhlAa8Q0gU",
+  authDomain: "rondine-common-ground.firebaseapp.com",
+  databaseURL: "https://rondine-common-ground-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId: "rondine-common-ground",
+  storageBucket: "rondine-common-ground.firebasestorage.app",
+  messagingSenderId: "986709719821",
+  appId: "1:986709719821:web:c52680735d17114a9ace44"
+}
 ```
 
 ## Anonimnost (obavezno, bez izuzetaka)
