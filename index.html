@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en" data-i18n-title="app.name">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title></title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body class="page-participant">
+  <main class="container">
+    <p class="status" id="loading" data-i18n="common.loading"></p>
+
+    <form id="join-form" class="card" hidden novalidate>
+      <h1 data-i18n="participant.title"></h1>
+
+      <label for="code" data-i18n="participant.codeLabel"></label>
+      <input id="code" name="code" class="input-code" maxlength="4" autocomplete="off"
+             autocapitalize="characters" spellcheck="false" data-i18n-placeholder="participant.codePlaceholder">
+
+      <label for="nickname" data-i18n="participant.nicknameLabel"></label>
+      <input id="nickname" name="nickname" maxlength="24" autocomplete="off"
+             data-i18n-placeholder="participant.nicknamePlaceholder">
+      <p class="hint" data-i18n="participant.nicknameHint"></p>
+
+      <p class="error" id="join-error" role="alert" hidden></p>
+      <button type="submit" id="join-button" class="button" data-i18n="participant.join"></button>
+    </form>
+
+    <section id="waiting" class="card center" hidden>
+      <h1 data-i18n="participant.waitingTitle"></h1>
+      <p data-i18n="participant.waitingText"></p>
+      <p class="hint" id="joined-as"></p>
+    </section>
+
+    <p class="error" id="fatal-error" role="alert" hidden></p>
+  </main>
+  <script type="module" src="js/participant.js"></script>
+</body>
+</html>

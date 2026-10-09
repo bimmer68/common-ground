@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en" data-i18n-title="host.title">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title></title>
+  <link rel="stylesheet" href="css/app.css">
+</head>
+<body class="page-host">
+  <main class="container">
+    <p class="status" id="loading" data-i18n="common.loading"></p>
+
+    <section id="create" class="card" hidden>
+      <h1 data-i18n="host.title"></h1>
+      <p class="notice" id="create-notice" hidden></p>
+      <p data-i18n="host.intro"></p>
+      <button type="button" id="create-button" class="button" data-i18n="host.create"></button>
+      <p class="error" id="create-error" role="alert" hidden></p>
+    </section>
+
+    <section id="dashboard" hidden>
+      <div class="card center">
+        <p class="label" data-i18n="host.sessionCode"></p>
+        <p class="big-code" id="code"></p>
+        <a class="button" id="screen-link" target="_blank" rel="noopener" data-i18n="host.openScreen"></a>
+        <p class="label" data-i18n="host.participantLink"></p>
+        <p class="link-text" id="participant-link"></p>
+      </div>
+
+      <div class="card">
+        <h2 id="participants-title"></h2>
+        <p class="hint" id="no-participants" data-i18n="host.noParticipants"></p>
+        <ul class="nickname-list" id="participants"></ul>
+      </div>
+
+      <button type="button" id="new-session" class="button button-secondary" data-i18n="host.newSession"></button>
+    </section>
+
+    <p class="error" id="fatal-error" role="alert" hidden></p>
+  </main>
+  <script type="module" src="js/host.js"></script>
+</body>
+</html>
