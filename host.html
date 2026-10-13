@@ -52,6 +52,9 @@
         <button type="button" id="end-activity" class="button button-secondary" data-i18n="host.endActivity" hidden></button>
       </div>
 
+      <!-- Timer for the projector, drawn by js/timer.js -->
+      <div class="card" id="timer"></div>
+
       <div class="card">
         <div id="new-activity">
           <h2 data-i18n="host.newActivity"></h2>
@@ -66,10 +69,10 @@
         <ul class="activity-list" id="activities"></ul>
       </div>
 
-      <div class="card">
-        <h2 id="participants-title"></h2>
-        <p class="hint" id="no-participants" data-i18n="host.noParticipants"></p>
-        <ul class="nickname-list" id="participants"></ul>
+      <div class="card center">
+        <p class="label" data-i18n="host.participants"></p>
+        <p class="big-count" id="participant-count">0</p>
+        <p class="hint" data-i18n="host.participantsHint"></p>
       </div>
 
       <div class="card">

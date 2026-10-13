@@ -20,7 +20,7 @@ Svaki "alat" (glasanje, oblak riječi, zid...) je samo drugačiji tip aktivnosti
 
 | Fajl | Ko ga koristi | Opis |
 |---|---|---|
-| `index.html` | Učesnici, na mobitelu | Ulaz sa kodom sesije i nadimkom, pa forma za trenutnu aktivnost |
+| `index.html` | Učesnici, na mobitelu | Ulaz sa kodom sesije i nadimkom (nadimak ostaje samo na mobitelu), pa forma za trenutnu aktivnost |
 | `screen.html` | Projektor, na laptopu | Velika slova, čitljivo sa 8 metara, tamna pozadina, visok kontrast. Bez ikakvih kontrola |
 | `host.html` | Facilitator, na mobitelu | Pravljenje sesije, pokretanje aktivnosti, otkrivanje rezultata, odobravanje tekstova |
 
@@ -55,10 +55,10 @@ const firebaseConfig = {
 ## Anonimnost (obavezno, bez izuzetaka)
 
 - Učesnik ulazi samo sa nadimkom. Nema imena, emaila ni naloga.
-- **Nadimak se nikad ne prikazuje na projektoru.** Služi samo facilitatoru da vidi ko je ušao.
+- **Nadimak se nikad ne šalje u bazu.** Ostaje samo na mobitelu učesnika (pozdrav "You're in, Lion!"). Ni facilitator ga ne vidi: facilitator vidi samo **broj** učesnika. Tako niko, ni facilitator, ne može povezati osobu sa odgovorom.
 - Izbor jezika se nigdje ne prikazuje (u grupi su strane u sukobu, a jezik može otkriti osobu).
 - Odgovori na projektoru su uvijek bez autora.
-- U bazi se odgovori vežu za anonimni Firebase uid, nikad za nadimak.
+- U bazi se odgovori vežu samo za anonimni Firebase uid.
 
 ## Sesija
 

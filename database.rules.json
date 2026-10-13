@@ -2,6 +2,59 @@
   "rules": {
     ".read": false,
     ".write": false,
+    "templates": {
+      "$tid": {
+        ".read": "auth != null",
+        ".write": "auth != null && (!data.exists() || data.child('ownerUid').val() === auth.uid)",
+        ".validate": "$tid.matches(/^[A-Z]{6}$/) && newData.hasChildren(['type', 'ownerUid', 'savedAt', 'config'])",
+        "type": {
+          ".validate": "newData.val() === 'poll'"
+        },
+        "ownerUid": {
+          ".validate": "newData.val() === auth.uid"
+        },
+        "savedAt": {
+          ".validate": "newData.val() === now"
+        },
+        "config": {
+          ".validate": "newData.hasChildren(['title', 'questions'])",
+          "title": {
+            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 80"
+          },
+          "questions": {
+            "$q": {
+              ".validate": "$q.matches(/^([0-9]|[1-4][0-9])$/) && newData.hasChildren(['type', 'text', 'live'])",
+              "type": {
+                ".validate": "newData.isString() && newData.val().matches(/^(yesno|truefalse|choice|rating)$/)"
+              },
+              "text": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 200"
+              },
+              "options": {
+                "$o": {
+                  ".validate": "$o.matches(/^[0-5]$/) && newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+                }
+              },
+              "tag": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 30"
+              },
+              "live": {
+                ".validate": "newData.isBoolean()"
+              },
+              "$other": {
+                ".validate": false
+              }
+            }
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
+        "$other": {
+          ".validate": false
+        }
+      }
+    },
     "sessions": {
       "$code": {
         ".validate": "$code.matches(/^[A-Z]{4}$/)",
@@ -47,12 +100,18 @@
             ".validate": "newData.val() === true"
           }
         },
-        "nicknames": {
-          ".read": "auth != null && root.child('sessions').child($code).child('meta').child('hostUid').val() === auth.uid",
-          "$uid": {
-            ".read": "auth != null && auth.uid === $uid",
-            ".write": "auth != null && auth.uid === $uid && root.child('sessions').child($code).child('meta').exists()",
-            ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 24"
+        "timer": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('sessions').child($code).child('meta').child('hostUid').val() === auth.uid",
+          ".validate": "newData.hasChildren(['startedAt', 'duration'])",
+          "startedAt": {
+            ".validate": "newData.val() === now || newData.val() === data.val()"
+          },
+          "duration": {
+            ".validate": "newData.isNumber() && newData.val() >= 5 && newData.val() <= 3600 && newData.val() % 1 === 0"
+          },
+          "$other": {
+            ".validate": false
           }
         },
         "current": {
@@ -86,6 +145,12 @@
             "config": {
               ".validate": "newData.hasChildren()"
             },
+            "state": {
+              ".validate": "newData.isString() && newData.val().matches(/^(statement|voting|results|compare)$/)"
+            },
+            "compare": {
+              ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
+            },
             "$other": {
               ".validate": false
             }
@@ -97,7 +162,7 @@
             "$phase": {
               "$uid": {
                 ".write": "auth != null && auth.uid === $uid && root.child('sessions').child($code).child('members').child($uid).val() === true && root.child('sessions').child($code).child('current').child('activityId').val() === $aid && root.child('sessions').child($code).child('activities').child($aid).child('phase').val() === $phase",
-                ".validate": "root.child('sessions').child($code).child('activities').child($aid).child('type').val() === 'measure' && newData.hasChildren(['0', '1'])",
+                ".validate": "(root.child('sessions').child($code).child('activities').child($aid).child('type').val() === 'measure' && newData.hasChildren(['0', '1'])) || (root.child('sessions').child($code).child('activities').child($aid).child('type').val() === 'poll' && root.child('sessions').child($code).child('activities').child($aid).child('state').val() === 'voting' && (newData.val() === 0 || newData.val() === 1 || newData.val() === 2 || newData.val() === 3 || newData.val() === 4 || newData.val() === 5))",
                 "$i": {
                   ".validate": "($i === '0' || $i === '1') && (newData.val() === 1 || newData.val() === 2 || newData.val() === 3 || newData.val() === 4 || newData.val() === 5)"
                 }

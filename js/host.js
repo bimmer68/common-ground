@@ -1,6 +1,7 @@
 // Facilitator page (host.html): create or take over a session, see who joined,
-// start activities and control them. The facilitator's phone is never shown
-// on the projector, so the host PIN and the nicknames are safe here.
+// start activities and control them, run the timer. The facilitator's phone is
+// never shown on the projector, so the host PIN is safe here. The facilitator
+// sees only HOW MANY people joined, never who (nicknames stay on the phones).
 import { ensureSignedIn } from "./firebase.js";
 import { t, applyTranslations } from "./i18n.js";
 import { showConnectionBanner } from "./connection.js";
@@ -8,11 +9,12 @@ import { el } from "./dom.js";
 import * as storage from "./storage.js";
 import {
   codeFromUrl, pageUrl, normalizeCode, isValidCode, isValidPin, getSessionMeta,
-  createSession, takeOverSession, getHostPin, watchMeta, watchNicknames
+  createSession, takeOverSession, getHostPin, watchMeta, watchMemberCount, isDenied
 } from "./session.js";
 import { startNewActivity, setCurrent, watchActivities } from "./activity-store.js";
 import { runActivityLoop } from "./activity-loop.js";
 import { activityTypes } from "./activities/index.js";
+import { timerControls } from "./timer.js";
 
 const $ = (id) => document.getElementById(id);
 const STORAGE_KEY = "host"; // { code }
@@ -37,6 +39,7 @@ function stopAll() {
 
 function showCreate(notice = "", code = "") {
   stopAll();
+  $("fatal-error").hidden = true;
   $("create-notice").textContent = notice;
   $("create-notice").hidden = !notice;
   $("takeover-code").value = code;
@@ -64,20 +67,40 @@ function showDashboard(code) {
     .then((pin) => { $("pin").textContent = pin || t("host.pinMissing"); })
     .catch((err) => console.error(err));
 
+  // Someone took over with the PIN: this phone quietly stops listening and
+  // shows only the takeover message (no error).
+  const lostControl = () => {
+    if (sessionCode !== code) return; // already handled
+    storage.remove(STORAGE_KEY);
+    showCreate(t("host.lostControl", { code }), code);
+  };
+
+  // A listener can be refused by the database ("permission denied") in the
+  // moment control moves to another device. That is not a real error: check
+  // who owns the session now, and only show an error if it is still us.
   const onError = (err) => {
+    if (sessionCode !== code) return; // this dashboard is already closed
     console.error(err);
-    showFatal(t("common.error"));
+    if (!isDenied(err)) return showFatal(t("common.error"));
+    getSessionMeta(code)
+      .then((meta) => {
+        if (meta && meta.hostUid !== uid) lostControl();
+        else if (sessionCode === code) showFatal(t("common.error"));
+      })
+      .catch(() => { if (sessionCode === code) showFatal(t("common.error")); });
   };
 
   // If someone takes over with the PIN, this phone loses control.
   stops.push(watchMeta(code, (meta) => {
-    if (meta && meta.hostUid !== uid) {
-      storage.remove(STORAGE_KEY);
-      showCreate(t("host.lostControl", { code }), code);
-    }
+    if (meta && meta.hostUid !== uid) lostControl();
   }, onError));
 
-  stops.push(watchNicknames(code, renderParticipants, onError));
+  // Only the number of participants – the facilitator never sees who they are.
+  stops.push(watchMemberCount(code, (count) => {
+    $("participant-count").textContent = String(count);
+  }, onError));
+
+  stops.push(timerControls({ el: $("timer"), code, onError }));
 
   // The same loop as on the phones and the projector; here modules draw controls.
   stops.push(runActivityLoop({
@@ -125,8 +148,9 @@ function openSetup(type) {
   $("activity-setup").hidden = false;
   activityTypes[type].setup({
     el: $("activity-setup"),
-    onStart: async (phase, config) => {
-      await startNewActivity(code, type, phase, config);
+    uid,
+    onStart: async (phase, config, extra) => {
+      await startNewActivity(code, type, phase, config, extra);
       closeSetup();
     },
     onCancel: closeSetup
@@ -137,17 +161,6 @@ function closeSetup() {
   $("activity-setup").replaceChildren();
   $("activity-setup").hidden = true;
   $("new-activity").hidden = false;
-}
-
-function renderParticipants(list) {
-  $("participants-title").textContent = t("host.participantsTitle", { count: list.length });
-  $("no-participants").hidden = list.length > 0;
-  const ul = $("participants");
-  ul.replaceChildren(...list.map(({ nickname }) => {
-    const li = document.createElement("li");
-    li.textContent = nickname; // textContent: a nickname can never inject HTML
-    return li;
-  }));
 }
 
 function onActionError(err) {

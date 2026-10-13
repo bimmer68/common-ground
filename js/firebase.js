@@ -46,6 +46,17 @@ export function ensureSignedIn() {
   });
 }
 
+// The difference between this device's clock and the database server's clock.
+// Firebase measures it when it connects and keeps it in ".info/serverTimeOffset".
+// serverNow() = "what time is it on the server right now", even if the clock
+// on this phone or laptop is a few seconds (or minutes) wrong.
+let serverOffset = 0;
+onValue(ref(db, ".info/serverTimeOffset"), (snap) => { serverOffset = Number(snap.val()) || 0; });
+
+export function serverNow() {
+  return Date.now() + serverOffset;
+}
+
 // Calls callback(true/false) whenever the connection to the database changes.
 export function watchConnection(callback) {
   return onValue(ref(db, ".info/connected"), (snap) => callback(snap.val() === true));

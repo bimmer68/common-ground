@@ -1,5 +1,7 @@
 // Participant page (index.html): enter code + nickname, then follow the
 // facilitator: the waiting card when nothing runs, otherwise the current activity.
+// The nickname stays ONLY on this phone (localStorage). It is never sent to
+// the database, so nobody can link this person to their answers.
 import { ensureSignedIn } from "./firebase.js";
 import { t, applyTranslations } from "./i18n.js";
 import { showConnectionBanner } from "./connection.js";
@@ -7,11 +9,11 @@ import * as storage from "./storage.js";
 import { runActivityLoop } from "./activity-loop.js";
 import {
   NICKNAME_MAX, codeFromUrl, normalizeCode, isValidCode, normalizeNickname,
-  isValidNickname, getSessionMeta, joinSession, isMember, getOwnNickname
+  isValidNickname, getSessionMeta, joinSession, isMember
 } from "./session.js";
 
 const $ = (id) => document.getElementById(id);
-const STORAGE_KEY = "participant"; // { code, nickname }
+const STORAGE_KEY = "participant"; // { code, nickname } – only on this phone
 
 let uid = null;
 let stopLoop = null;
@@ -26,7 +28,10 @@ function showError(message) {
 }
 
 function showJoined(code, nickname) {
-  $("joined-as").textContent = t("participant.joinedAs", { nickname, code });
+  $("waiting-title").textContent = nickname
+    ? t("participant.waitingTitleNamed", { nickname })
+    : t("participant.waitingTitle");
+  $("joined-as").textContent = t("participant.joinedAs", { code });
   show("waiting");
   // Keep the code in the address bar, so a refresh lands in the same session.
   history.replaceState(null, "", `?s=${code}`);
@@ -64,7 +69,8 @@ async function start() {
   if (code) {
     try {
       if (await isMember(code, uid)) {
-        const nickname = saved?.code === code ? saved.nickname : await getOwnNickname(code, uid);
+        // The nickname is only in this browser; if it was cleared, we simply greet without it.
+        const nickname = saved?.code === code ? saved.nickname || "" : "";
         storage.save(STORAGE_KEY, { code, nickname });
         showJoined(code, nickname);
         return;
@@ -101,7 +107,7 @@ async function join() {
       showError(t("participant.errorNotFound"));
       return;
     }
-    await joinSession(code, uid, nickname);
+    await joinSession(code, uid);
     storage.save(STORAGE_KEY, { code, nickname });
     showJoined(code, nickname);
   } catch (err) {
