@@ -219,3 +219,67 @@ Zadnjih 10 sekundi tajmer postane dvostruko veći, crven i "pulsira": `@keyframe
 ### `position: fixed`
 Tajmer na projektoru je "zakucan" u gornji desni ugao (`position: fixed`), iznad bilo čega drugog (`z-index`). Zato se vidi preko QR koda i preko svake aktivnosti, a aktivnosti ne moraju ništa znati o njemu.
 
+
+---
+
+## Faze 4 i 5: Oblak riječi, zid i moderisani zid
+
+### Zajednička osnova (jedan dio koda za tri aktivnosti)
+Oblak riječi, zid i moderisani zid na mobitelu rade isto: učesnik napiše kratak tekst, može poslati 1–3 teksta, i može ih urediti ili obrisati dok je pisanje otvoreno. Zato je taj dio napisan **jednom**:
+- `js/text-store.js` – sve što ide u bazu i iz baze (dodaj, uredi, obriši, odobri, glasaj, pogađaj).
+- `js/activities/text-base.js` – forma na mobitelu (`textWriter`), normalizacija riječi, uklapanje teksta u projektor.
+
+Tri modula (`wordcloud.js`, `wall.js`, `moderated-wall.js`) se razlikuju samo po tome **kako prikazuju** tekstove. Moderisani zid još i koristi dijelove zida (`import { wallScreen, … } from "./wall.js"`), pa se ništa ne piše dvaput.
+
+### Tekst bez autora
+U bazi tekst izgleda ovako:
+```
+posts/-Nx7a…/main/-Ny2b…   { text: "Asking questions", group: true, at: 1761552000000 }
+```
+Nema uid-a, nema nadimka, nema jezika. Jedina veza između osobe i teksta je:
+```
+mine/-Nx7a…/main/xyz789/0: "-Ny2b…"     ← "slot 0 je moj tekst"
+```
+a `mine/…/xyz789` po pravilima baze smije čitati **samo** uid `xyz789`. Ni projektor ni facilitator ne mogu saznati ko je šta napisao, čak ni kad otvore alate za programere u browseru.
+
+### Slotovi (kako baza broji "najviše 3 po osobi")
+Pravila baze ne znaju brojati ("koliko tekstova ima ova osoba?"). Zato svaka osoba ima tri "ladice": `0`, `1`, `2`. Pravilo kaže: ladica `1` je dozvoljena samo ako je `perPerson` ≥ 2, ladica `2` samo ako je ≥ 3. Ladica se popuni jednom i isprazni jednom (kad se tekst briše), pa niko ne može imati više tekstova nego ladica. Isto važi za glasove na zidu (`votes/{id}/{uid}/0…4`).
+
+### Jedan upis za dvije stvari
+Kad učesnik pošalje tekst, u **jednom** koraku se upišu i tekst i ladica:
+```js
+update(ref(db, "sessions/ROND"), {
+  "mine/abc/main/xyz789/0": "-Ny2b…",
+  "posts/abc/main/-Ny2b…": { text: "Hello", at: serverTimestamp() }
+});
+```
+Pravilo za tekst provjerava da ladica **poslije** upisa pokazuje na taj tekst (`newData`). Ili uspije oboje, ili ništa.
+
+### Normalizacija riječi
+Da bi "Trust!", " trust " i "TRUST" bila ista riječ u oblaku, svaki odgovor se "očisti": mala slova, bez razmaka na krajevima, bez interpunkcije na kraju (`normalizeWord` u `text-base.js`). Regularni izraz `/[\s\p{P}]+$/u` znači "sve razmake i znakove interpunkcije na kraju". `\p{P}` hvata interpunkciju iz svih pisama, ne samo engleskog.
+
+### Veličina riječi i kvadratni korijen
+Riječ koju je napisalo više ljudi je veća. Ali kad bi veličina rasla ravno sa brojem (10 puta → 10 puta veće), jedna česta riječ bi napravila sve ostale sitnim. Zato koristimo kvadratni korijen: `Math.sqrt(4 / 16) = 0.5`, pa riječ sa 4 glasa ima pola veličine riječi sa 16, a ne četvrtinu.
+
+### Ključ u bazi ne smije imati tačku
+Firebase ključevi ne smiju sadržavati `. # $ [ ] /`. Kad facilitator ukloni riječ "u.s.a.", upisujemo je kao ključ `u%2Es%2Ea%2E` (`wordKey` koristi `encodeURIComponent`).
+
+### Uklapanje u ekran (`fitToBox`)
+Na zidu može biti 1 ili 45 kartica. Projektor prvo nacrta sve u punoj veličini, pa smanjuje (CSS varijabla `--fit`: 1 → 0.9 → 0.81 …) dok sve ne stane. U CSS-u piše npr. `font-size: calc(var(--fit) * 6vh)`. Pri promjeni veličine prozora ponovo se računa.
+
+### Moderisani zid: dvije odvojene "kutije"
+Pravilo baze ne može reći "čitaj samo odobrene tekstove iz ove liste" – ko smije čitati listu, vidi sve u njoj. Zato su neodobreni i odobreni tekstovi na **dva različita mjesta**:
+```
+inbox/{id}/main/{pid}   čeka odobrenje – čita SAMO facilitator (i autor svoj tekst)
+posts/{id}/main/{pid}   odobreno – čita svako (projektor)
+```
+Facilitator odobrava tako što kopira tekst iz `inbox` u `posts`. Pravilo dozvoljava tu kopiju samo ako je tekst **tačno isti** kao u inboxu, i bez skrivene oznake.
+
+### Skrivena oznaka i "Reveal" koji ne može lagati
+U igri "Ko je ovo napisao?" autor tajno bira oznaku ("I believe this" / "I don't believe this"). Oznaka je samo u `inbox`, nikad u `posts`, pa je ostali ne mogu pročitati prije otkrivanja. Na Reveal facilitator upiše `activities/{id}/answer`, a pravilo prihvata samo vrijednost koja je **jednaka** oznaci iz inboxa. Autor ne može pogađati svoj tekst (pravilo provjerava njegove ladice), a njegov mobitel mu samo kaže "ovo je tvoj tekst".
+
+### Testiranje uživo sa emulatorom i headless browserom
+Za ovu fazu testirali smo i pravila (82 provjere na Firebase emulatoru: npr. projektor ne može pročitati `inbox`, učesnik ne može urediti tuđu karticu) i cijelu aplikaciju: "headless" Chromium (browser bez prozora) je otvorio četiri ekrana (facilitator, projektor, dva učesnika), kliktao i provjeravao šta se vidi na projektoru.
+
+### Veliki tajmer
+Tajmer u bazi sada ima i `big: true/false`. Na projektoru to samo doda CSS klasu `timer-big`, koja tajmer razvuče preko cijelog ekrana (`position: fixed; inset: 0`). Facilitator ga može uključiti i dok tajmer već teče.
