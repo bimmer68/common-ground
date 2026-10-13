@@ -7,6 +7,7 @@ import { t, applyTranslations } from "./i18n.js";
 import { showConnectionBanner } from "./connection.js";
 import { codeFromUrl, pageUrl, normalizeCode, isValidCode, getSessionMeta, watchMemberCount } from "./session.js";
 import { runActivityLoop } from "./activity-loop.js";
+import { timerDisplay } from "./timer.js";
 
 const $ = (id) => document.getElementById(id);
 
@@ -76,11 +77,17 @@ async function openSession(code) {
   });
 
   $("code").textContent = code;
-  $("join-url").textContent = t("screen.orGoTo", { url: pageUrl("index.html").replace(/^https?:\/\//, "") });
+  // Shortest address that works: without "https://" and without "index.html"
+  // (the web server opens index.html by itself for a folder address).
+  const shortUrl = pageUrl("index.html").replace(/^https?:\/\//, "").replace(/\/index\.html$/, "");
+  $("join-url").textContent = t("screen.orGoTo", { url: shortUrl });
 
   watchMemberCount(code, (count) => {
     $("count").textContent = t("screen.participants", { count });
   });
+
+  // The timer floats on top of everything (lobby or activity).
+  timerDisplay({ el: $("timer"), code });
 
   // Follow the facilitator: QR lobby when nothing runs, otherwise the activity.
   runActivityLoop({

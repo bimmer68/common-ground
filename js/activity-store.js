@@ -2,17 +2,18 @@
 //
 // Database layout (see database.rules.json):
 //   sessions/{CODE}/current                        { activityId }   – what is running now (only the facilitator writes)
-//   sessions/{CODE}/activities/{id}                { type, phase, revealed, createdAt, config }
+//   sessions/{CODE}/activities/{id}                { type, phase, revealed, createdAt, config, state?, compare? }
 //   sessions/{CODE}/responses/{id}/{phase}/{uid}   the participant's answer (tied to the uid, never to a nickname)
 import { db, ref, get, set, update, push, onValue, serverTimestamp } from "./firebase.js";
 
 const path = (code, part) => `sessions/${code}/${part}`;
 
 // Creates a new activity and makes it the current one, in a single write.
-export async function startNewActivity(code, type, phase, config) {
+// extra: more fields some types need from the start (the poll's "state").
+export async function startNewActivity(code, type, phase, config, extra = {}) {
   const id = push(ref(db, path(code, "activities"))).key; // a new unique id, nothing is written yet
   await update(ref(db, `sessions/${code}`), {
-    [`activities/${id}`]: { type, phase, revealed: false, createdAt: serverTimestamp(), config },
+    [`activities/${id}`]: { ...extra, type, phase, revealed: false, createdAt: serverTimestamp(), config },
     current: { activityId: id }
   });
   return id;

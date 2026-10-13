@@ -22,19 +22,25 @@
     </form>
 
     <section id="lobby" class="lobby" hidden>
-      <div class="lobby-qr">
-        <div id="qr" class="qr"></div>
-        <p class="lobby-scan" data-i18n="screen.scanToJoin"></p>
+      <div class="lobby-main">
+        <div class="lobby-qr">
+          <div id="qr" class="qr"></div>
+          <p class="lobby-scan" data-i18n="screen.scanToJoin"></p>
+        </div>
+        <div class="lobby-info">
+          <p class="lobby-code" id="code"></p>
+          <p class="lobby-count" id="count"></p>
+        </div>
       </div>
-      <div class="lobby-info">
-        <p class="lobby-code" id="code"></p>
-        <p class="lobby-url" id="join-url"></p>
-        <p class="lobby-count" id="count"></p>
-      </div>
+      <!-- Full width, so the sentence can be big enough to read from 8 metres. -->
+      <p class="lobby-url" id="join-url"></p>
     </section>
 
     <!-- The current activity is drawn here by its module (js/activities/). -->
     <section id="activity" class="screen-activity" hidden></section>
+
+    <!-- Timer, shown on top of the lobby or any activity (js/timer.js). -->
+    <div id="timer" class="timer" role="timer" hidden></div>
   </main>
   <script type="module" src="js/screen.js"></script>
 </body>

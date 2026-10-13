@@ -111,19 +111,10 @@ input:focus { outline: none; border-color: var(--accent); }
 
 .link-text { word-break: break-all; margin: 0; font-size: 0.95rem; }
 
-.nickname-list {
-  list-style: none;
+.big-count {
+  font-size: 3rem;
+  font-weight: 800;
   margin: 0;
-  padding: 0;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.nickname-list li {
-  background: var(--bg);
-  border-radius: 999px;
-  padding: 6px 14px;
 }
 
 .connection-banner {
@@ -226,3 +217,64 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent); }
   font-size: 0.8rem;
 }
 .scale-ends span:last-child { text-align: right; }
+
+/* ---------- Faza 3: quick poll and timer ---------- */
+
+h3 { font-size: 1.05rem; margin: 20px 0 8px; }
+
+.button-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.inline-form { margin-top: 12px; }
+.inline-row { display: flex; gap: 8px; align-items: center; margin-top: 8px; }
+.inline-row input { flex: 1; min-width: 0; }
+.inline-row .button-small { flex: none; }
+
+.button-small.button-secondary { padding: 6px 14px; }
+
+/* Checkbox with its text on the same line. */
+.check { display: flex; gap: 10px; align-items: flex-start; font-weight: 400; }
+.check input { width: 22px; height: 22px; flex: none; margin-top: 2px; }
+
+/* One question in the facilitator's list. */
+.poll-edit {
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  margin: 16px 0 0;
+  padding: 4px 14px 14px;
+}
+.poll-edit legend { font-weight: 700; padding: 0 6px; }
+.poll-options-edit .label { margin-top: 12px; }
+.poll-templates { border-top: 1px solid var(--border); margin-top: 24px; }
+
+.poll-host-question { font-size: 1.2rem; font-weight: 600; margin: 4px 0 8px; }
+
+.poll-mini { list-style: none; margin: 8px 0 0; padding: 0; }
+.poll-mini li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+}
+.poll-mini li span:last-child { font-weight: 700; white-space: nowrap; }
+
+/* Big answer buttons on the participant's phone. */
+.poll-question-phone { font-size: 1.4rem; }
+.poll-buttons { display: flex; flex-direction: column; gap: 10px; margin-top: 8px; }
+.poll-buttons-row { flex-direction: row; }
+.poll-buttons-row .poll-option { flex: 1; padding: 16px 0; }
+
+.poll-option {
+  font: inherit;
+  font-size: 1.2rem;
+  font-weight: 700;
+  padding: 16px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+  color: var(--text);
+  cursor: pointer;
+}
+.poll-option-chosen { background: var(--accent); border-color: var(--accent); color: var(--accent-text); }
+
+/* Time left on the facilitator's phone. */
+.timer-left { font-size: 2.6rem; font-weight: 800; margin: 0; text-align: center; }

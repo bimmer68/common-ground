@@ -18,3 +18,9 @@ export function el(tag, props = {}, ...children) {
   node.append(...children.flat().filter((child) => child != null && child !== false));
   return node;
 }
+
+// Like node.replaceChildren(), but also accepts lists and skips empty values,
+// the same way el() does:  fill(root, title, maybeNull, [a, b])
+export function fill(node, ...children) {
+  node.replaceChildren(...children.flat().filter((child) => child != null && child !== false && child !== ""));
+}

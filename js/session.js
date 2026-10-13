@@ -3,10 +3,13 @@
 // Database layout (see database.rules.json):
 //   sessions/{CODE}/meta              { hostUid, createdAt }  – who owns the session
 //   sessions/{CODE}/members/{uid}     true                    – used for counting (no names!)
-//   sessions/{CODE}/nicknames/{uid}   "nickname"              – only the facilitator can read
 //   sessions/{CODE}/hostPin           "123456"                – only the facilitator can read
 //   sessions/{CODE}/pinAttempts/{uid} { pin, at }             – a takeover try, nobody can read
-// Activities are in js/activity-store.js.
+// Activities are in js/activity-store.js, the timer in js/timer.js.
+//
+// The nickname is NEVER written to the database. It stays only in the
+// participant's own browser (localStorage), so nobody – not even the
+// facilitator – can link a person to an answer.
 import { db, ref, get, set, update, onValue, serverTimestamp } from "./firebase.js";
 
 // No I and O, so nobody confuses them with 1 and 0.
@@ -99,7 +102,7 @@ export function watchMeta(code, callback, onError) {
   return onValue(ref(db, path(code, "meta")), (snap) => callback(snap.val()), onError);
 }
 
-const isDenied = (err) => String(err?.code || err?.message || "").toUpperCase().includes("PERMISSION_DENIED");
+export const isDenied = (err) => String(err?.code || err?.message || "").toUpperCase().includes("PERMISSION_DENIED");
 
 // Take control of a session from this device with the code and the host PIN.
 // Two steps, both checked by the database rules:
@@ -123,12 +126,9 @@ export async function takeOverSession(code, uid, pin) {
   return "ok";
 }
 
-// Participant joins: nickname and membership are written together.
-export function joinSession(code, uid, nickname) {
-  return update(ref(db, path(code)), {
-    [`nicknames/${uid}`]: nickname,
-    [`members/${uid}`]: true
-  });
+// Participant joins: only "this uid is a member" is written, no name.
+export function joinSession(code, uid) {
+  return set(ref(db, path(code, `members/${uid}`)), true);
 }
 
 export async function isMember(code, uid) {
@@ -136,24 +136,7 @@ export async function isMember(code, uid) {
   return snap.val() === true;
 }
 
-// A participant may read back only their own nickname.
-export async function getOwnNickname(code, uid) {
-  const snap = await get(ref(db, path(code, `nicknames/${uid}`)));
-  return snap.val() || "";
-}
-
 // Calls callback(number) every time someone joins.
-export function watchMemberCount(code, callback) {
-  return onValue(ref(db, path(code, "members")), (snap) => callback(snap.size));
-}
-
-// Facilitator only: calls callback([{ uid, nickname }]) every time the list changes.
-export function watchNicknames(code, callback, onError) {
-  return onValue(ref(db, path(code, "nicknames")), (snap) => {
-    const list = [];
-    snap.forEach((child) => {
-      list.push({ uid: child.key, nickname: child.val() });
-    });
-    callback(list);
-  }, onError);
+export function watchMemberCount(code, callback, onError) {
+  return onValue(ref(db, path(code, "members")), (snap) => callback(snap.size), onError);
 }

@@ -10,7 +10,7 @@ Ovdje se skupljaju pojmovi koje susrećemo dok gradimo aplikaciju. Svaki pojam i
 Tri jezika od kojih je napravljena svaka web stranica.
 - **HTML** opisuje *šta* je na stranici (naslov, polje za unos, dugme). Primjer: `index.html` ima polje za kod i polje za nadimak.
 - **CSS** opisuje *kako to izgleda* (boje, veličine, raspored). Primjer: `css/screen.css` pravi crnu pozadinu i ogromna slova za projektor.
-- **JavaScript** opisuje *šta se dešava* (klik na dugme, slanje podataka). Primjer: `js/participant.js` šalje nadimak u bazu kad učesnik klikne "Join".
+- **JavaScript** opisuje *šta se dešava* (klik na dugme, slanje podataka). Primjer: `js/participant.js` upiše učesnika u bazu kad klikne "Join".
 
 ### Statička stranica i GitHub Pages
 "Statička" znači da server samo šalje fajlove onakve kakvi jesu, bez ikakvog programa na serveru. GitHub Pages besplatno objavljuje fajlove iz repoa kao web stranicu. Sav "rad" radi browser, a podatke dijeli Firebase.
@@ -36,11 +36,10 @@ Naše stablo u ovoj fazi:
 sessions
   └─ ROND
        ├─ meta        { hostUid: "abc123", createdAt: 1761552000000 }
-       ├─ members
-       │    └─ xyz789: true
-       └─ nicknames
-            └─ xyz789: "Lion"
+       └─ members
+            └─ xyz789: true
 ```
+(U Fazi 1 tu je bio i `nicknames`. Od Faze 3 nadimak se uopšte ne čuva u bazi, vidi "Podatak koji ne postoji ne može procuriti" niže.)
 
 ### Listener (slušač) – `onValue`
 Funkcija koja kaže: "javi mi svaki put kad se ovaj dio baze promijeni". Primjer: `watchMemberCount` u `js/session.js` sluša `sessions/ROND/members` i projektor odmah ispiše novi broj učesnika.
@@ -58,7 +57,7 @@ Primjeri iz našeg fajla:
 - `".read": false` na vrhu → po defaultu niko ne može ništa čitati.
 - `"auth.uid === $uid"` → možeš upisati samo svoj članski zapis, ne tuđi.
 - `"!data.exists()"` → sesija se može napraviti, ali postojeća se ne može prepisati.
-- Nadimke (`nicknames`) može čitati samo facilitator čiji je uid upisan u `meta/hostUid`.
+- PIN (`hostPin`) može čitati samo facilitator čiji je uid upisan u `meta/hostUid`.
 
 ### `$code` i `$uid` u pravilima
 Znak `$` znači "bilo koji ključ na ovom mjestu". `sessions/$code` važi za `sessions/ROND`, `sessions/ABCD` itd., a unutar pravila `$code` sadrži stvarnu vrijednost.
@@ -66,7 +65,7 @@ Znak `$` znači "bilo koji ključ na ovom mjestu". `sessions/$code` važi za `se
 ### `.read`, `.write`, `.validate`
 - `.read` – ko smije čitati.
 - `.write` – ko smije pisati.
-- `.validate` – da li je podatak ispravnog oblika (npr. nadimak je tekst od 1 do 24 znaka).
+- `.validate` – da li je podatak ispravnog oblika (npr. PIN je tekst od tačno 6 cifara).
 
 ### `now` i `serverTimestamp()`
 `serverTimestamp()` kaže bazi "upiši trenutno vrijeme sa servera" (ne sa mobitela, jer sat na mobitelu može biti pogrešan). U pravilima `now` je to isto vrijeme, pa provjeravamo `createdAt === now`.
@@ -78,7 +77,7 @@ Znak `$` znači "bilo koji ključ na ovom mjestu". `sessions/$code` važi za `se
 Dio adrese poslije `?`. Stranica ga može pročitati. Primjer: `screen.html?s=ROND` kaže projektoru koju sesiju da prikaže. Funkcija `codeFromUrl()` u `js/session.js` ga čita.
 
 ### localStorage
-Mala "ladica" u browseru koja pamti tekst i nakon zatvaranja stranice. Mi tu pamtimo samo kod sesije (i nadimak na učesnikovom mobitelu), da bi nakon osvježavanja znali gdje se vratiti. Vidi `js/storage.js`.
+Mala "ladica" u browseru koja pamti tekst i nakon zatvaranja stranice. Mi tu pamtimo kod sesije, nadimak (samo na učesnikovom mobitelu, nikad u bazi) i kodove šablona, da bi nakon osvježavanja znali gdje se vratiti. Vidi `js/storage.js`.
 
 ### `history.replaceState`
 Mijenja adresu u browseru bez ponovnog učitavanja stranice. Kad facilitator napravi sesiju, adresa postane `host.html?s=ROND`, pa i obično osvježavanje vodi nazad u istu sesiju.
@@ -93,7 +92,7 @@ Skraćenica: između "i" i "n" ima 18 slova. Znači pripremiti aplikaciju za vi�
 Tekst `"{count} joined"` ima rupu koja se popuni vrijednošću: `t("screen.participants", { count: 5 })` daje `"5 joined"`. Tako i jezici sa drugačijim redom riječi mogu staviti broj gdje im odgovara.
 
 ### `textContent` umjesto `innerHTML`
-Kad prikazujemo nešto što je korisnik upisao (nadimak), koristimo `textContent`. Tako, ako neko upiše `<script>…`, to se prikaže kao običan tekst i ne može se izvršiti kao kod.
+Kad prikazujemo nešto što je korisnik upisao (nadimak, tekst pitanja), koristimo `textContent`. Tako, ako neko upiše `<script>…`, to se prikaže kao običan tekst i ne može se izvršiti kao kod.
 
 ### QR kod
 Kvadratni crtež koji mobitel kamerom pretvori u link. Biblioteka `qrcodejs` ga crta u browseru (`new QRCode(...)` u `js/screen.js`), pa ne trebamo nikakav vanjski servis.
@@ -161,3 +160,62 @@ Skala 1–5 na mobitelu su obična `<input type="radio">` polja (samo jedno se m
 
 ### `el()` pomoćnik
 `js/dom.js` pravi elemente iz JavaScripta: `el("p", { class: "hint", text: "Hello" })`. Tekst uvijek ide kao `textContent`, pa tvrdnja koju facilitator upiše nikad ne može postati kod na stranici.
+
+---
+
+## Faza 3: Brzo glasanje i tajmer
+
+### Podatak koji ne postoji ne može procuriti
+Nadimak je prije bio u bazi (`nicknames`), a čitati ga je mogao samo facilitator. Ali i facilitator je osoba iz sobe: da je vidio "Lion" i znao ko je Lion, mogao bi pokušati povezati osobu sa odgovorom. Zato nadimak sada **uopšte ne ide u bazu**. Ostaje u localStorage-u učesnikovog mobitela i služi samo za pozdrav "You're in, Lion!". U bazi je samo `members/xyz789: true`, pa facilitator vidi samo broj. Najsigurniji podatak je onaj koji nikad nije ni sačuvan.
+
+### "Permission denied" kod slušača (listener)
+Kad pravila baze nekome oduzmu pravo čitanja, Firebase prekine njegov slušač i javi grešku `PERMISSION_DENIED`. Na starom facilitatorovom uređaju se to desilo u trenutku preuzimanja PIN-om (slušač nadimaka je izgubio pravo), pa je izašlo "Something went wrong". Sada (`onError` u `js/host.js`): ako je greška "permission denied", stranica prvo provjeri ko je sad vlasnik sesije. Ako je to drugi uređaj, mirno ugasi sve slušače i pokaže samo poruku o preuzimanju.
+
+### Jednina i množina (`Intl.PluralRules`)
+"1 answers" je greška: na engleskom je 1 answer, 2 answers. Tekst sa brojem sada ima dva oblika:
+```js
+"poll.votes": { one: "{count} vote", other: "{count} votes" }
+```
+`t("poll.votes", { count: 1 })` → "1 vote". Browser ima ugrađeni `Intl.PluralRules` koji zna pravila svakog jezika. To će trebati kod prevoda: bosanski ima tri oblika (1 glas, 2 glasa, 5 glasova), a `Intl.PluralRules("bs")` ih zna razlikovati ("one", "few", "other"). Vidi `js/i18n.js`.
+
+### Stanja (state machine)
+Svako pitanje u glasanju ima tačno jedno od stanja: `statement` → `voting` → `results` (+ posebno stanje `compare`). Stanje je jedno polje u bazi (`activities/{id}/state`) i svi ekrani crtaju prema njemu. Dugme Next samo pomjeri stanje za jedan korak. Prednost: nikad ne može biti "pola otvoreno"; ako mobitel osvježi stranicu, pročita stanje i nacrta tačno ono što treba.
+
+### Lista pitanja i Next / Back
+Cijela lista je jedan dugi red koraka: pitanje 1 izjava, pitanje 1 glasanje, pitanje 1 rezultati, pitanje 2 izjava… Next ide jedan korak naprijed, Back jedan nazad (`nextStep` i `previousStep` u `js/activities/poll.js`). Koje pitanje je uključeno piše u `phase` ("q0" = prvo pitanje, "q1" = drugo…), pa svako pitanje ima svoje glasove: `responses/{id}/q1/{uid}: 2`.
+
+### Pravila koja gledaju drugo polje
+Glas se smije upisati samo dok je `state` jednak `"voting"`:
+```
+root.child('sessions').child($code).child('activities').child($aid).child('state').val() === 'voting'
+```
+Kad facilitator klikne "Reveal", baza sama odbija nove glasove, bez obzira šta radi kod na mobitelu.
+
+### Glas kao broj (indeks)
+U bazu ne ide tekst opcije ("winked"), nego njen redni broj, počevši od nule: "believed" = 0, "winked" = 1. Kraće je, pravila lako provjere da je broj od 0 do 5, a ista opcija ostaje ista i kad se tekst kasnije prevede na drugi jezik.
+
+### Procenat i zaokruživanje
+Procenat = glasovi za opciju / svi glasovi × 100, zaokruženo na cijeli broj (`Math.round`). Zbog zaokruživanja zbir ponekad bude 99% ili 101%; to je normalno.
+
+### Oznaka (tag) i ekran Compare
+Pitanje može imati oznaku, npr. "Win" ili "Dialogue". Compare sabere glasove svih pitanja sa istom oznakom i pokaže koliki dio je otišao na izabranu opciju: "Win: 8% moved · Dialogue: 55% moved". Opcije se porede po tekstu, bez obzira na velika/mala slova (`key()` u `poll.js`).
+
+### Šablon (template) sa kodom
+Lista pitanja se može sačuvati u `templates/KXPTRM`. Kod od 6 slova radi kao ključ: ko zna kod, može učitati šablon na bilo kojem uređaju i u bilo kojoj sesiji. Pravila dozvoljavaju čitanje jednog šablona po kodu, ali **ne** spiska svih šablona, pa učesnik ne može "listati" pitanja koja dolaze. Mijenjati šablon može samo uređaj koji ga je napravio (`ownerUid`). Vidi `js/templates.js`.
+
+### Serversko vrijeme i tajmer
+Sat na svakom uređaju može kasniti ili žuriti. Zato tajmer u bazi ima samo dvije stvari:
+```
+timer: { startedAt: 1761552000000, duration: 90 }
+```
+`startedAt` upiše **server** (`serverTimestamp()`), ne mobitel. Svaki ekran sam računa: kraj = `startedAt + 90 s`; preostalo = kraj − "sada na serveru". "Sada na serveru" dobijemo iz `.info/serverTimeOffset`: Firebase izmjeri razliku između sata ovog uređaja i sata servera (npr. +2300 ms), pa `serverNow() = Date.now() + razlika` (`js/firebase.js`). Niko ne mora odbrojavati i slati svake sekunde, pa tajmer ostaje tačan na projektoru i kad facilitatorov mobitel zaspi.
+
+### `setInterval` i `visibilitychange`
+`setInterval(draw, 200)` ponovo nacrta tajmer pet puta u sekundi. Kad je stranica u pozadini (zaključan ekran), browser usporava ili pauzira takve funkcije; zato slušamo i `visibilitychange` (stranica ponovo vidljiva) i odmah ponovo izračunamo. Pošto se uvijek računa iz serverskog vremena, ništa se ne "izgubi" dok je uređaj spavao.
+
+### CSS animacija (`@keyframes`)
+Zadnjih 10 sekundi tajmer postane dvostruko veći, crven i "pulsira": `@keyframes timer-pulse` malo ga poveća i vrati, svake sekunde (`css/screen.css`). Ko u sistemu traži manje pokreta (`prefers-reduced-motion`), dobije crveni tajmer bez pulsiranja.
+
+### `position: fixed`
+Tajmer na projektoru je "zakucan" u gornji desni ugao (`position: fixed`), iznad bilo čega drugog (`z-index`). Zato se vidi preko QR koda i preko svake aktivnosti, a aktivnosti ne moraju ništa znati o njemu.
+
