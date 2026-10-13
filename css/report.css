@@ -1,0 +1,92 @@
+/* Report (report.html): a clean, light page for printing or saving as PDF. */
+:root {
+  --text: #1d1d1f;
+  --muted: #5f6368;
+  --line: #d9d6d0;
+  --accent: #1f5f8b;
+  --bar: #9cc3dc;
+}
+
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+body {
+  margin: 0;
+  background: #fff;
+  color: var(--text);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+.report { max-width: 780px; margin: 0 auto; padding: 40px 24px 56px; }
+.report-status { text-align: center; color: var(--muted); font-family: system-ui, sans-serif; }
+.report-error { color: #b3261e; font-weight: 600; }
+
+/* Headings and labels use a plain sans-serif; the content stays in serif. */
+h1, h2, h3, h4, .report-kicker, .report-facts, .report-meta, .report-button, .report-hint,
+.report-table th, .report-footer { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+
+.report-header { border-bottom: 3px solid var(--text); padding-bottom: 20px; margin-bottom: 8px; }
+.report-kicker { margin: 0; font-size: 0.85rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; color: var(--accent); }
+h1 { font-size: 2rem; line-height: 1.2; margin: 4px 0 20px; }
+
+.report-facts { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin: 0; }
+.report-facts dt { font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); }
+.report-facts dd { margin: 2px 0 0; font-size: 1.25rem; font-weight: 700; }
+
+.report-actions { display: flex; align-items: center; gap: 16px; margin-top: 20px; flex-wrap: wrap; }
+.report-button {
+  border: none; border-radius: 10px; padding: 12px 22px;
+  background: var(--accent); color: #fff; font-size: 1rem; font-weight: 700; cursor: pointer;
+}
+.report-hint { margin: 0; font-size: 0.85rem; color: var(--muted); }
+
+.report-section { margin-top: 36px; }
+h2 { font-size: 1.35rem; margin: 0 0 12px; padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+h3 { font-size: 0.95rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin: 20px 0 8px; }
+h4 { font-size: 1rem; margin: 18px 0 6px; }
+
+.report-activity + .report-activity { margin-top: 24px; }
+.report-item { margin-top: 16px; break-inside: avoid; }
+.report-question { font-weight: 700; margin: 12px 0 2px; }
+.report-meta { color: var(--muted); font-size: 0.85rem; margin: 0 0 6px; }
+.report-empty { color: var(--muted); font-style: italic; margin: 4px 0; }
+
+.report-table { width: 100%; border-collapse: collapse; margin: 6px 0 0; }
+.report-table th, .report-table td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+.report-table th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 700; }
+.report-num { text-align: right !important; white-space: nowrap; }
+.report-strong { font-weight: 700; }
+
+/* Poll bars: a light bar behind the numbers (kept in print, see below). */
+.report-bars td:first-child { width: 38%; }
+.report-bar-cell { width: 40%; }
+.report-bar { display: block; height: 12px; min-width: 2px; background: var(--bar); border-radius: 3px; }
+
+.report-words { margin: 4px 0 0; line-height: 2; }
+.report-word { display: inline-block; border: 1px solid var(--line); border-radius: 999px; padding: 0 10px; margin: 0 6px 6px 0; line-height: 1.7; }
+.report-word-count { color: var(--muted); font-size: 0.85rem; }
+
+.report-list, .report-board { margin: 6px 0 0; padding-left: 1.4em; }
+.report-list li, .report-board li { margin: 0 0 8px; break-inside: avoid; }
+.report-board li { font-size: 1.1rem; }
+.report-board-text { font-weight: 700; }
+
+.report-footer { margin-top: 48px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 0.8rem; color: var(--muted); }
+
+@media (max-width: 600px) {
+  .report-facts { grid-template-columns: repeat(2, 1fr); }
+  h1 { font-size: 1.6rem; }
+}
+
+/* Print / PDF: no button, A4 margins, bars keep their colour. */
+@page { size: A4; margin: 18mm 16mm; }
+@media print {
+  body { font-size: 11pt; }
+  .report { max-width: none; padding: 0; }
+  .report-actions { display: none; }
+  .report-section { break-before: auto; }
+  h2, h3, h4 { break-after: avoid; }
+  .report-bar { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}

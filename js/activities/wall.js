@@ -347,11 +347,34 @@ export function wallScreen({ el: root, code, activityId, activity }) {
   };
 }
 
+// ---------- Report (report.html, shared with the moderated wall) ----------
+// The texts that were on the projector (never hidden ones; for the moderated
+// wall "posts" holds only approved texts), sorted by votes if people voted.
+export function wallReport({ activity, posts, votes }) {
+  const voted = voterCount(votes) > 0;
+  const cards = cardsOf(posts[ROUND], hiddenOf(activity, ROUND), tallyVotes(votes), voted);
+  return [
+    el("p", { class: "report-question", text: activity.config?.prompt || "" }),
+    el("p", { class: "report-meta" }, [
+      t("report.texts", { count: cards.length }),
+      voted ? t("wall.voters", { count: voterCount(votes) }) : null
+    ].filter(Boolean).join(" · ")),
+    cards.length === 0 && el("p", { class: "report-empty", text: t("wall.noCards") }),
+    el("ul", { class: "report-list" }, cards.map((card) => el("li", {},
+      el("span", { text: card.text }),
+      (voted || card.group) && el("span", { class: "report-meta" }, ` · ${[
+        card.group ? t("text.group") : null,
+        voted ? t("poll.votes", { count: card.votes }) : null
+      ].filter(Boolean).join(" · ")}`))))
+  ];
+}
+
 export default {
   name: "wall.name",
   setup,
   describe,
   host,
   participant,
-  screen: wallScreen
+  screen: wallScreen,
+  report: wallReport
 };

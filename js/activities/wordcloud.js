@@ -329,11 +329,31 @@ function screen({ el: root, code, activityId, activity }) {
   };
 }
 
+// ---------- Report (report.html) ----------
+// The words of every prompt, most frequent first. Words the facilitator
+// removed from the projector are left out.
+function report({ activity, posts }) {
+  return [
+    activity.config?.title && el("p", { class: "report-question", text: activity.config.title }),
+    promptsOf(activity).map((prompt, i) => {
+      const words = countWords(posts[`q${i}`], hiddenOf(activity, `q${i}`)).filter((w) => !w.hidden);
+      return el("div", { class: "report-item" },
+        el("p", { class: "report-question", text: `${i + 1}. ${prompt}` }),
+        words.length === 0
+          ? el("p", { class: "report-empty", text: t("cloud.noWords") })
+          : el("p", { class: "report-words" }, words.map((w) => el("span", { class: "report-word" },
+            el("span", { text: w.word }),
+            w.count > 1 && el("span", { class: "report-word-count", text: ` ×${w.count}` })))));
+    })
+  ];
+}
+
 export default {
   name: "cloud.name",
   setup,
   describe,
   host,
   participant,
-  screen
+  screen,
+  report
 };

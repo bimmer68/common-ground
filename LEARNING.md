@@ -283,3 +283,51 @@ Za ovu fazu testirali smo i pravila (82 provjere na Firebase emulatoru: npr. pro
 
 ### Veliki tajmer
 Tajmer u bazi sada ima i `big: true/false`. Na projektoru to samo doda CSS klasu `timer-big`, koja tajmer razvuče preko cijelog ekrana (`position: fixed; inset: 0`). Facilitator ga može uključiti i dok tajmer već teče.
+
+---
+
+## Popravka, Common Ground (Faza 8) i izvještaj (Faza 6)
+
+### Lista u listi (`flat` i `flat(Infinity)`)
+Pomoćnik `el()` prima djecu i kao listu: `el("div", {}, [a, b])`. Prije je koristio `children.flat()`, koji "spljošti" samo **jedan** nivo:
+```js
+[[label1, input1], [label2, input2]].flat()   // → [label1, input1], [label2, input2]  (još uvijek liste!)
+```
+Kad browser dobije listu tamo gdje očekuje element, pretvori je u tekst: `"[object HTMLLabelElement],[object HTMLInputElement]"`. Upravo to se vidjelo kod "Hidden label game". Sada `el()` i `fill()` koriste `flat(Infinity)`: spljošti se svaki nivo, koliko god lista bilo jedna u drugoj (`js/dom.js`).
+
+### Izračunato, a ne sačuvano
+Tabla "Common Ground" nigdje nije upisana u bazu. Svaki ekran je sam **izračuna** iz glasova i praga (`statementsOf` u `js/activities/common-ground.js`): "ova verzija ima 9 od 11 glasova *I can sign* = 82% ≥ 80% → na tabli je". Prednost: kad facilitator promijeni prag sa 80% na 75%, tabla i metar se odmah promijene, bez ikakvog "prepisivanja" table. Podatak koji se izračuna ne može biti u neskladu sa glasovima.
+
+### Verzije i historija
+Tvrdnja ima verzije: `v0` je tekst kako je predložen, `v1`, `v2`… su facilitatorove nove verzije:
+```
+activities/-Nx7a…/versions/-Ny2b…   { v0: "Every person deserves to feel safe.", v1: "… at home and on the street." }
+signs/-Nx7a…/-Ny2b…/v0/xyz789: 1     ← glas za staru verziju ostaje
+signs/-Nx7a…/-Ny2b…/v1/xyz789: 0     ← nova verzija ima svoje glasove
+```
+Nova verzija se nikad ne upisuje preko stare, pa se uvijek vidi "v1: 33% → v2: 100%".
+
+### "Glasačka kutija" (`ballot`) u pravilima
+`activities/{id}/ballot = { pid, v }` kaže o kojoj tvrdnji i verziji se sad glasa. Pravilo za glas provjerava da se glasa **baš** o toj verziji i samo dok je `state === "voting"`. Kad facilitator zatvori glasanje ili pusti novu verziju, baza sama odbija glasove za staru.
+
+### Pravilo koje traži da nešto postoji (`isString()` na drugom mjestu)
+`ballot` je dozvoljen samo ako tekst te verzije postoji:
+`newData.parent().child('versions').child(pid).child(v).isString()`. Tako projektor nikad ne može dobiti "glasaj o tekstu koji ne postoji". U istom upisu facilitator može napraviti i verziju i ballot (`newData` vidi oba).
+
+### Prag i zaokruživanje
+Procenat "I can sign" se računa od onih koji su **glasali** za tu verziju (ne od svih u sobi) i zaokružuje se na cijeli broj, isti broj koji projektor prikazuje. Tako se nikad ne desi da projektor kaže "80%", a tvrdnja ne prođe prag od 80%.
+
+### Polje za kucanje koje se ne smije ponovo crtati
+Facilitatorov ekran se ponovo nacrta sa svakim novim glasom. Kad bi i polje "New version" bilo nacrtano ponovo, tekst koji facilitator kuca bi nestao i tastatura bi se zatvorila. Zato to polje ima svoju "kutiju" (`reviseBox`) koja se crta ponovo **samo** kad se promijeni tvrdnja ili verzija na glasanju.
+
+### Izvještaj: svaki modul piše svoj dio
+Svaki modul aktivnosti sada može imati i funkciju `report()`, pored `host`, `participant` i `screen`. Stranica `report.html` (`js/report.js`) samo prođe kroz registar (`js/activities/index.js`) i za svaku aktivnost pozove njen `report()`. Novi tip aktivnosti dobije svoj dio izvještaja dodavanjem jedne funkcije u svoj fajl.
+
+### Snimak, ne uživo (`get` umjesto `onValue`)
+Projektor sluša bazu uživo (`onValue`). Izvještaj umjesto toga jednom pročita sve što treba (`get`, u `js/report-store.js`) – to je snimak stanja u trenutku otvaranja. Čita samo javne dijelove: nikad `inbox` (neodobreni tekstovi) ni `mine` (ko je šta napisao).
+
+### Štampanje i PDF (`@media print`, `@page`)
+U `css/report.css` dio `@media print { … }` važi samo kad se stranica štampa: dugme "Print" nestane, slova se prilagode papiru. `@page { size: A4; margin: … }` određuje veličinu papira i margine. `break-inside: avoid` kaže "ne sijeci ovo pitanje na dvije stranice". PDF se dobije u prozoru za štampu: odredište "Save as PDF". `print-color-adjust: exact` čuva boju stubića (browser inače štampa bez pozadinskih boja).
+
+### Pristup izvještaju
+`report.html?s=ROND` provjeri da li je uid ovog browsera jednak `meta/hostUid`. Ako nije, prikaže samo poruku. Novi tab u istom browseru ima isti anonimni uid, pa ga facilitator otvara dugmetom "Open report" sa svog ekrana.

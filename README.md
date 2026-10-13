@@ -109,4 +109,4 @@ Jezici: engleski, bosanski, srpski, italijanski, ruski, ukrajinski, azerbejdžan
 5. **Zid sa glasanjem i moderisani zid.**
 6. **Izvještaj.**
 7. **Jezici** (13 jezika, RTL).
-8. **Metar zajedničkog tla** (opcionalno): vizualizacija zida gdje tvrdnje sa preko 80% glasova "can sign" pune metar.
+8. **Metar zajedničkog tla** (obavezno): aktivnost "Common Ground" – tvrdnje sa najmanje 80% glasova "I can sign" (prag mijenja facilitator) idu na tablu i pune metar.

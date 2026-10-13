@@ -639,11 +639,55 @@ function screen({ el: root, code, activityId, activity }) {
   };
 }
 
+// ---------- Report (report.html) ----------
+// Every question with its votes per option, then Compare: for every option
+// used by tagged questions, the % per tag (the same numbers as the projector).
+function report({ activity, responses }) {
+  const questions = questionsOf(activity);
+  const tags = tagsOf(questions);
+  return [
+    activity.config?.title && el("p", { class: "report-question", text: activity.config.title }),
+    questions.map((question, i) => {
+      const options = optionsOf(question);
+      const counts = tally(responses[`q${i}`], options.length);
+      const total = sum(counts);
+      const average = question.type === "rating" ? ratingAverage(counts) : null;
+      return el("div", { class: "report-item" },
+        el("p", { class: "report-question", text: `${i + 1}. ${question.text || ""}` }),
+        el("p", { class: "report-meta" }, [
+          t(`poll.type.${question.type}`),
+          question.tag ? t("report.tag", { tag: question.tag }) : null,
+          t("poll.votes", { count: total }),
+          average != null ? t("poll.average", { value: average.toFixed(1) }) : null
+        ].filter(Boolean).join(" · ")),
+        el("table", { class: "report-table report-bars" },
+          el("tbody", {}, options.map((label, k) => el("tr", {},
+            el("td", { text: label }),
+            el("td", { class: "report-bar-cell" }, el("span", { class: "report-bar", style: `width: ${percent(counts[k], total)}%` })),
+            el("td", { class: "report-num report-strong", text: `${percent(counts[k], total)}%` }),
+            el("td", { class: "report-num", text: String(counts[k]) }))))));
+    }),
+    tags.length > 0 && el("div", { class: "report-item" },
+      el("h4", { text: t("report.compareTitle") }),
+      el("p", { class: "report-meta", text: t("report.compareHint") }),
+      el("table", { class: "report-table" },
+        el("thead", {}, el("tr", {},
+          el("th", { text: t("poll.compareOption") }),
+          tags.map((tag) => el("th", { class: "report-num", text: tag })))),
+        el("tbody", {}, compareOptionsOf(questions).map((option) => el("tr", {},
+          el("td", { text: option }),
+          compareData(questions, responses, option).map((row) => el("td", {
+            class: "report-num", text: row.pct == null ? t("measure.noValue") : `${row.pct}%`
+          })))))))
+  ];
+}
+
 export default {
   name: "poll.name", // i18n key for the "start new activity" button
   setup,
   describe,
   host,
   participant,
-  screen
+  screen,
+  report
 };

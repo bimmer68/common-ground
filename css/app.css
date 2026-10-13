@@ -334,3 +334,12 @@ h3 { font-size: 1.05rem; margin: 20px 0 8px; }
 .guess-card { border: 3px solid var(--accent); }
 .guess-text { font-size: 1.3rem; font-weight: 700; overflow-wrap: anywhere; }
 .guess-answer { font-weight: 800; color: var(--accent); }
+
+/* Common Ground (facilitator) */
+.ground-ballot { border-top: 1px solid var(--border); margin-top: 16px; }
+.ground-verdict { font-weight: 700; margin: 12px 0 0; }
+.ground-verdict-yes { color: #1e7a3c; }
+.ground-revise:not(:empty) { border-top: 1px solid var(--border); margin-top: 20px; }
+.ground-card-passed .host-card-text::before { content: "✓ "; color: #1e7a3c; }
+.ground-history { margin: 6px 0 0; padding-left: 1.4em; font-size: 0.9rem; }
+.ground-history li { margin-bottom: 4px; overflow-wrap: anywhere; }
