@@ -31,7 +31,7 @@ import {
 } from "../text-store.js";
 import { list, clean, hiddenOf, checkbox, fitToBox, refitOnResize } from "./text-base.js";
 import {
-  ROUND, LIMITS, wallSetup, stateButtons, changer, hostCard, cardsOf, voterCount, wallParticipant, wallScreen
+  ROUND, LIMITS, wallSetup, stateButtons, changer, hostCard, cardsOf, voterCount, wallParticipant, wallScreen, wallReport
 } from "./wall.js";
 
 const labelsOf = (act) => {
@@ -364,5 +364,8 @@ export default {
   describe,
   host,
   participant,
-  screen
+  screen,
+  // Only approved texts are in "posts", so the report can never show a text
+  // that was waiting or hidden. The secret labels (inbox) are never read.
+  report: wallReport
 };

@@ -6,18 +6,24 @@
 // Nothing else in the app has to change: the loop (js/activity-loop.js)
 // picks the module by the activity's "type" and lets it draw the screen.
 //
-// wordcloud, wall and moderatedWall share the text base (text-base.js and
-// js/text-store.js): the phone part is the same, only the projector differs.
+// wordcloud, wall, moderatedWall and commonGround share the text base
+// (text-base.js and js/text-store.js): the phone part is the same, only the
+// projector differs.
+//
+// A module can also have report(data): its part of the printable report
+// (report.html). The report shows the types in the order of this list.
 import measure from "./measure.js";
 import poll from "./poll.js";
 import wordcloud from "./wordcloud.js";
 import wall from "./wall.js";
 import moderatedWall from "./moderated-wall.js";
+import commonGround from "./common-ground.js";
 
 export const activityTypes = {
   measure,
   poll,
   wordcloud,
   wall,
-  moderatedWall
+  moderatedWall,
+  commonGround
 };

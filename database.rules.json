@@ -158,10 +158,13 @@
                 "$l": {
                   ".validate": "($l === '0' || $l === '1') && newData.isString() && newData.val().length >= 1 && newData.val().length <= 40"
                 }
+              },
+              "threshold": {
+                ".validate": "newData.isNumber() && newData.val() % 1 === 0 && newData.val() >= 50 && newData.val() <= 100"
               }
             },
             "state": {
-              ".validate": "newData.isString() && newData.val().matches(/^(statement|voting|results|compare|writing)$/)"
+              ".validate": "newData.isString() && newData.val().matches(/^(statement|voting|results|compare|writing|board)$/)"
             },
             "compare": {
               ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
@@ -178,6 +181,25 @@
             },
             "answer": {
               ".validate": "(newData.val() === 0 || newData.val() === 1) && newData.val() === root.child('sessions').child($code).child('inbox').child($aid).child(newData.parent().child('phase').val()).child(newData.parent().child('spotlight').val()).child('label').val()"
+            },
+            "versions": {
+              "$pid": {
+                "$v": {
+                  ".validate": "$v.matches(/^v(1?[0-9])$/) && newData.isString() && newData.val().length >= 1 && newData.val().length <= 200"
+                }
+              }
+            },
+            "ballot": {
+              ".validate": "newData.hasChildren(['pid', 'v']) && newData.parent().child('versions').child(newData.child('pid').val()).child(newData.child('v').val()).isString()",
+              "pid": {
+                ".validate": "newData.isString() && newData.val().matches(/^[-_a-zA-Z0-9]{20}$/)"
+              },
+              "v": {
+                ".validate": "newData.isString() && newData.val().matches(/^v(1?[0-9])$/)"
+              },
+              "$other": {
+                ".validate": false
+              }
             },
             "$other": {
               ".validate": false
@@ -203,10 +225,10 @@
           "$aid": {
             "$round": {
               "$pid": {
-                ".write": "(auth != null && root.child('sessions').child($code).child('members').child(auth.uid).val() === true && root.child('sessions').child($code).child('current').child('activityId').val() === $aid && root.child('sessions').child($code).child('activities').child($aid).child('phase').val() === $round && root.child('sessions').child($code).child('activities').child($aid).child('state').val() === 'writing' && (root.child('sessions').child($code).child('activities').child($aid).child('type').val() === 'wordcloud' || root.child('sessions').child($code).child('activities').child($aid).child('type').val() === 'wall') && (root.child('sessions').child($code).child('mine').child($aid).child($round).child(auth.uid).child('0').val() === $pid || root.child('sessions').child($code).child('mine').child($aid).child($round).child(auth.uid).child('1').val() === $pid || root.child('sessions').child($code).child('mine').child($aid).child($round).child(auth.uid).child('2').val() === $pid || newData.parent().parent().parent().parent().child('mine').child($aid).child($round).child(auth.uid).child('0').val() === $pid || newData.parent().parent().parent().parent().child('mine').child($aid).child($round).child(auth.uid).child('1').val() === $pid || newData.parent().parent().parent().parent().child('mine').child($aid).child($round).child(auth.uid).child('2').val() === $pid)) || (auth != null && root.child('sessions').child($code).child('members').child(auth.uid).val() === true && root.child('sessions').child($code).child('current').child('activityId').val() === $aid && root.child('sessions').child($code).child('activities').child($aid).child('phase').val() === $round && root.child('sessions').child($code).child('activities').child($aid).child('state').val() === 'writing' && root.child('sessions').child($code).child('activities').child($aid).child('type').val() === 'moderatedWall' && !newData.exists() && (root.child('sessions').child($code).child('mine').child($aid).child($round).child(auth.uid).child('0').val() === $pid || root.child('sessions').child($code).child('mine').child($aid).child($round).child(auth.uid).child('1').val() === $pid || root.child('sessions').child($code).child('mine').child($aid).child($round).child(auth.uid).child('2').val() === $pid)) || (auth != null && root.child('sessions').child($code).child('meta').child('hostUid').val() === auth.uid && root.child('sessions').child($code).child('activities').child($aid).child('type').val() === 'moderatedWall')",
+                ".write": "(auth != null && root.child('sessions').child($code).child('members').child(auth.uid).val() === true && root.child('sessions').child($code).child('current').child('activityId').val() === $aid && root.child('sessions').child($code).child('activities').child($aid).child('phase').val() === $round && root.child('sessions').child($code).child('activities').child($aid).child('state').val() === 'writing' && (root.child('sessions').child($code).child('activities').child($aid).child('type').val() === 'wordcloud' || root.child('sessions').child($code).child('activities').child($aid).child('type').val() === 'wall') && (root.child('sessions').child($code).child('mine').child($aid).child($round).child(auth.uid).child('0').val() === $pid || root.child('sessions').child($code).child('mine').child($aid).child($round).child(auth.uid).child('1').val() === $pid || root.child('sessions').child($code).child('mine').child($aid).child($round).child(auth.uid).child('2').val() === $pid || newData.parent().parent().parent().parent().child('mine').child($aid).child($round).child(auth.uid).child('0').val() === $pid || newData.parent().parent().parent().parent().child('mine').child($aid).child($round).child(auth.uid).child('1').val() === $pid || newData.parent().parent().parent().parent().child('mine').child($aid).child($round).child(auth.uid).child('2').val() === $pid)) || (auth != null && root.child('sessions').child($code).child('members').child(auth.uid).val() === true && root.child('sessions').child($code).child('current').child('activityId').val() === $aid && root.child('sessions').child($code).child('activities').child($aid).child('phase').val() === $round && root.child('sessions').child($code).child('activities').child($aid).child('state').val() === 'writing' && (root.child('sessions').child($code).child('activities').child($aid).child('type').val() === 'moderatedWall' || root.child('sessions').child($code).child('activities').child($aid).child('type').val() === 'commonGround') && !newData.exists() && (root.child('sessions').child($code).child('mine').child($aid).child($round).child(auth.uid).child('0').val() === $pid || root.child('sessions').child($code).child('mine').child($aid).child($round).child(auth.uid).child('1').val() === $pid || root.child('sessions').child($code).child('mine').child($aid).child($round).child(auth.uid).child('2').val() === $pid)) || (auth != null && root.child('sessions').child($code).child('meta').child('hostUid').val() === auth.uid && (root.child('sessions').child($code).child('activities').child($aid).child('type').val() === 'moderatedWall' || root.child('sessions').child($code).child('activities').child($aid).child('type').val() === 'commonGround'))",
                 ".validate": "newData.hasChildren(['text', 'at'])",
                 "text": {
-                  ".validate": "newData.isString() && newData.val().length >= 1 && ((root.child('sessions').child($code).child('activities').child($aid).child('type').val() === 'wordcloud' && newData.val().length <= 40) || (root.child('sessions').child($code).child('activities').child($aid).child('type').val() !== 'wordcloud' && newData.val().length <= 200)) && (root.child('sessions').child($code).child('activities').child($aid).child('type').val() !== 'moderatedWall' || newData.val() === root.child('sessions').child($code).child('inbox').child($aid).child($round).child($pid).child('text').val())"
+                  ".validate": "newData.isString() && newData.val().length >= 1 && ((root.child('sessions').child($code).child('activities').child($aid).child('type').val() === 'wordcloud' && newData.val().length <= 40) || (root.child('sessions').child($code).child('activities').child($aid).child('type').val() !== 'wordcloud' && newData.val().length <= 200)) && ((root.child('sessions').child($code).child('activities').child($aid).child('type').val() !== 'moderatedWall' && root.child('sessions').child($code).child('activities').child($aid).child('type').val() !== 'commonGround') || newData.val() === root.child('sessions').child($code).child('inbox').child($aid).child($round).child($pid).child('text').val())"
                 },
                 "group": {
                   ".validate": "newData.val() === true"
@@ -227,7 +249,7 @@
             "$round": {
               "$pid": {
                 ".read": "auth != null && (root.child('sessions').child($code).child('mine').child($aid).child($round).child(auth.uid).child('0').val() === $pid || root.child('sessions').child($code).child('mine').child($aid).child($round).child(auth.uid).child('1').val() === $pid || root.child('sessions').child($code).child('mine').child($aid).child($round).child(auth.uid).child('2').val() === $pid)",
-                ".write": "auth != null && root.child('sessions').child($code).child('members').child(auth.uid).val() === true && root.child('sessions').child($code).child('current').child('activityId').val() === $aid && root.child('sessions').child($code).child('activities').child($aid).child('phase').val() === $round && root.child('sessions').child($code).child('activities').child($aid).child('state').val() === 'writing' && root.child('sessions').child($code).child('activities').child($aid).child('type').val() === 'moderatedWall' && (root.child('sessions').child($code).child('mine').child($aid).child($round).child(auth.uid).child('0').val() === $pid || root.child('sessions').child($code).child('mine').child($aid).child($round).child(auth.uid).child('1').val() === $pid || root.child('sessions').child($code).child('mine').child($aid).child($round).child(auth.uid).child('2').val() === $pid || newData.parent().parent().parent().parent().child('mine').child($aid).child($round).child(auth.uid).child('0').val() === $pid || newData.parent().parent().parent().parent().child('mine').child($aid).child($round).child(auth.uid).child('1').val() === $pid || newData.parent().parent().parent().parent().child('mine').child($aid).child($round).child(auth.uid).child('2').val() === $pid)",
+                ".write": "auth != null && root.child('sessions').child($code).child('members').child(auth.uid).val() === true && root.child('sessions').child($code).child('current').child('activityId').val() === $aid && root.child('sessions').child($code).child('activities').child($aid).child('phase').val() === $round && root.child('sessions').child($code).child('activities').child($aid).child('state').val() === 'writing' && (root.child('sessions').child($code).child('activities').child($aid).child('type').val() === 'moderatedWall' || root.child('sessions').child($code).child('activities').child($aid).child('type').val() === 'commonGround') && (root.child('sessions').child($code).child('mine').child($aid).child($round).child(auth.uid).child('0').val() === $pid || root.child('sessions').child($code).child('mine').child($aid).child($round).child(auth.uid).child('1').val() === $pid || root.child('sessions').child($code).child('mine').child($aid).child($round).child(auth.uid).child('2').val() === $pid || newData.parent().parent().parent().parent().child('mine').child($aid).child($round).child(auth.uid).child('0').val() === $pid || newData.parent().parent().parent().parent().child('mine').child($aid).child($round).child(auth.uid).child('1').val() === $pid || newData.parent().parent().parent().parent().child('mine').child($aid).child($round).child(auth.uid).child('2').val() === $pid)",
                 ".validate": "newData.hasChildren(['text', 'at']) && (!root.child('sessions').child($code).child('activities').child($aid).child('config').child('labels').exists() || newData.hasChild('label'))",
                 "text": {
                   ".validate": "newData.isString() && newData.val().length >= 1 && ((root.child('sessions').child($code).child('activities').child($aid).child('type').val() === 'wordcloud' && newData.val().length <= 40) || (root.child('sessions').child($code).child('activities').child($aid).child('type').val() !== 'wordcloud' && newData.val().length <= 200))"
@@ -279,6 +301,19 @@
               "$uid": {
                 ".write": "auth != null && auth.uid === $uid && root.child('sessions').child($code).child('members').child(auth.uid).val() === true && root.child('sessions').child($code).child('current').child('activityId').val() === $aid && root.child('sessions').child($code).child('activities').child($aid).child('type').val() === 'moderatedWall' && root.child('sessions').child($code).child('activities').child($aid).child('spotlight').val() === $pid && !root.child('sessions').child($code).child('activities').child($aid).child('answer').exists() && root.child('sessions').child($code).child('mine').child($aid).child(root.child('sessions').child($code).child('activities').child($aid).child('phase').val()).child(auth.uid).child('0').val() !== $pid && root.child('sessions').child($code).child('mine').child($aid).child(root.child('sessions').child($code).child('activities').child($aid).child('phase').val()).child(auth.uid).child('1').val() !== $pid && root.child('sessions').child($code).child('mine').child($aid).child(root.child('sessions').child($code).child('activities').child($aid).child('phase').val()).child(auth.uid).child('2').val() !== $pid",
                 ".validate": "newData.val() === 0 || newData.val() === 1"
+              }
+            }
+          }
+        },
+        "signs": {
+          ".read": "auth != null",
+          "$aid": {
+            "$pid": {
+              "$v": {
+                "$uid": {
+                  ".write": "auth != null && auth.uid === $uid && root.child('sessions').child($code).child('members').child(auth.uid).val() === true && root.child('sessions').child($code).child('current').child('activityId').val() === $aid && root.child('sessions').child($code).child('activities').child($aid).child('type').val() === 'commonGround' && root.child('sessions').child($code).child('activities').child($aid).child('state').val() === 'voting' && root.child('sessions').child($code).child('activities').child($aid).child('ballot').child('pid').val() === $pid && root.child('sessions').child($code).child('activities').child($aid).child('ballot').child('v').val() === $v",
+                  ".validate": "newData.val() === 0 || newData.val() === 1 || newData.val() === 2"
+                }
               }
             }
           }

@@ -58,6 +58,7 @@ function showDashboard(code) {
 
   $("code").textContent = code;
   $("screen-link").href = pageUrl("screen.html", code);
+  $("report-link").href = pageUrl("report.html", code);
   $("participant-link").textContent = pageUrl("index.html", code);
   $("pin").textContent = "";
   closeSetup();

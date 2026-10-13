@@ -282,11 +282,30 @@ function screen({ el: root, code, activityId, activity }) {
   };
 }
 
+// ---------- Report (report.html) ----------
+// The average before -> after for each statement, with the number of answers.
+function report({ activity, responses }) {
+  const cell = (s) => (s.avg == null ? t("measure.noValue") : t("report.average", { value: formatAvg(s.avg), count: s.n }));
+  return [
+    el("p", { class: "report-meta", text: `${t("measure.scaleLow")} · ${t("measure.scaleHigh")}` }),
+    el("table", { class: "report-table" },
+      el("thead", {}, el("tr", {},
+        el("th", { text: t("report.statement") }),
+        el("th", { class: "report-num", text: phaseName("before") }),
+        el("th", { class: "report-num", text: phaseName("after") }))),
+      el("tbody", {}, statementsOf(activity).map((statement, i) => el("tr", {},
+        el("td", { text: statement }),
+        el("td", { class: "report-num", text: cell(stats(responses.before, i)) }),
+        el("td", { class: "report-num report-strong", text: cell(stats(responses.after, i)) })))))
+  ];
+}
+
 export default {
   name: "measure.name", // i18n key for the "start new activity" button
   setup,
   describe,
   host,
   participant,
-  screen
+  screen,
+  report
 };
