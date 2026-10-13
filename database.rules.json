@@ -10,13 +10,34 @@
           ".write": "auth != null && !data.exists()",
           ".validate": "newData.hasChildren(['hostUid', 'createdAt'])",
           "hostUid": {
+            ".write": "auth != null && data.exists() && root.child('sessions').child($code).child('hostPin').exists() && root.child('sessions').child($code).child('pinAttempts').child(auth.uid).child('pin').val() === root.child('sessions').child($code).child('hostPin').val()",
             ".validate": "newData.val() === auth.uid"
           },
           "createdAt": {
-            ".validate": "newData.val() === now"
+            ".validate": "newData.val() === now || newData.val() === data.val()"
           },
           "$other": {
             ".validate": false
+          }
+        },
+        "hostPin": {
+          ".read": "auth != null && root.child('sessions').child($code).child('meta').child('hostUid').val() === auth.uid",
+          ".write": "auth != null && !data.exists() && newData.parent().child('meta').child('hostUid').val() === auth.uid",
+          ".validate": "newData.isString() && newData.val().matches(/^[0-9]{6}$/)"
+        },
+        "pinAttempts": {
+          "$uid": {
+            ".write": "auth != null && auth.uid === $uid && root.child('sessions').child($code).child('meta').exists() && (!data.exists() || data.child('at').val() < now - 5000)",
+            ".validate": "newData.hasChildren(['pin', 'at'])",
+            "pin": {
+              ".validate": "newData.isString() && newData.val().matches(/^[0-9]{6}$/)"
+            },
+            "at": {
+              ".validate": "newData.val() === now"
+            },
+            "$other": {
+              ".validate": false
+            }
           }
         },
         "members": {
@@ -32,6 +53,56 @@
             ".read": "auth != null && auth.uid === $uid",
             ".write": "auth != null && auth.uid === $uid && root.child('sessions').child($code).child('meta').exists()",
             ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 24"
+          }
+        },
+        "current": {
+          ".read": "auth != null",
+          ".write": "auth != null && root.child('sessions').child($code).child('meta').child('hostUid').val() === auth.uid",
+          ".validate": "newData.hasChildren(['activityId'])",
+          "activityId": {
+            ".validate": "newData.isString() && newData.parent().parent().child('activities').child(newData.val()).exists()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        },
+        "activities": {
+          ".read": "auth != null",
+          "$aid": {
+            ".write": "auth != null && root.child('sessions').child($code).child('meta').child('hostUid').val() === auth.uid",
+            ".validate": "newData.hasChildren(['type', 'phase', 'revealed', 'createdAt'])",
+            "type": {
+              ".validate": "newData.isString() && newData.val().matches(/^[a-z][a-zA-Z]{0,31}$/) && (!data.exists() || data.val() === newData.val())"
+            },
+            "phase": {
+              ".validate": "newData.isString() && newData.val().matches(/^[a-z][a-zA-Z0-9]{0,31}$/)"
+            },
+            "revealed": {
+              ".validate": "newData.isBoolean()"
+            },
+            "createdAt": {
+              ".validate": "newData.isNumber()"
+            },
+            "config": {
+              ".validate": "newData.hasChildren()"
+            },
+            "$other": {
+              ".validate": false
+            }
+          }
+        },
+        "responses": {
+          ".read": "auth != null",
+          "$aid": {
+            "$phase": {
+              "$uid": {
+                ".write": "auth != null && auth.uid === $uid && root.child('sessions').child($code).child('members').child($uid).val() === true && root.child('sessions').child($code).child('current').child('activityId').val() === $aid && root.child('sessions').child($code).child('activities').child($aid).child('phase').val() === $phase",
+                ".validate": "root.child('sessions').child($code).child('activities').child($aid).child('type').val() === 'measure' && newData.hasChildren(['0', '1'])",
+                "$i": {
+                  ".validate": "($i === '0' || $i === '1') && (newData.val() === 1 || newData.val() === 2 || newData.val() === 3 || newData.val() === 4 || newData.val() === 5)"
+                }
+              }
+            }
           }
         },
         "$other": {

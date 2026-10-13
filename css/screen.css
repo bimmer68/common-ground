@@ -68,3 +68,63 @@ body.page-screen {
 }
 
 .page-screen .connection-banner { font-size: 2.5vh; position: fixed; left: 0; right: 0; }
+
+/* ---------- Code entry (screen.html without ?s=CODE) ---------- */
+.enter { text-align: center; }
+.enter label { font-size: 6vh; font-weight: 700; margin: 0 0 4vh; }
+
+.enter input {
+  width: 5.5em;
+  font-size: 12vh;
+  font-weight: 800;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  padding: 1vh 2vh;
+  background: #111;
+  color: #fff;
+  border: 0.5vh solid #666;
+  border-radius: 2vh;
+}
+.enter input:focus { border-color: #ffd84d; }
+
+.enter button {
+  display: block;
+  margin: 4vh auto 0;
+  padding: 2vh 8vh;
+  font: inherit;
+  font-size: 5vh;
+  font-weight: 800;
+  background: #ffd84d;
+  color: #000;
+  border: none;
+  border-radius: 2vh;
+  cursor: pointer;
+}
+
+.enter-error { color: #ff8a80; font-size: 4vh; font-weight: 700; margin: 3vh 0 0; }
+
+/* ---------- Activities ---------- */
+.screen-activity { width: 100%; text-align: center; }
+
+/* Measurement, before Reveal: only the number of answers. */
+.measure-phase {
+  font-size: 7vh;
+  font-weight: 800;
+  color: #ffd84d;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  margin: 0 0 3vh;
+}
+.measure-instruction { font-size: 5vh; margin: 0 0 6vh; }
+.measure-count { font-size: 16vh; font-weight: 800; line-height: 1.1; margin: 0; }
+
+/* Measurement, after Reveal: average before → after for each statement. */
+.measure-results { display: flex; flex-direction: column; gap: 7vh; }
+.measure-statement { font-size: 4.2vh; max-width: 85vw; margin: 0 auto 2vh; }
+.measure-shift { display: flex; align-items: center; justify-content: center; gap: 5vw; }
+.measure-value { min-width: 22vw; }
+.measure-number { font-size: 17vh; font-weight: 800; line-height: 1; }
+.measure-value.after .measure-number { color: #ffd84d; }
+.measure-label { font-size: 3vh; color: #cfcfcf; margin-top: 1vh; }
+.measure-arrow { font-size: 13vh; line-height: 1; color: #9e9e9e; }

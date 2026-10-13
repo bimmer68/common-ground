@@ -12,6 +12,7 @@ import {
   get,
   set,
   update,
+  push,
   onValue,
   serverTimestamp
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-database.js";
@@ -21,7 +22,7 @@ const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getDatabase(app);
 
-export { ref, get, set, update, onValue, serverTimestamp };
+export { ref, get, set, update, push, onValue, serverTimestamp };
 
 // Resolves with the anonymous user. Firebase remembers the user in the
 // browser, so after a page refresh we get the SAME uid back instead of a new one.
