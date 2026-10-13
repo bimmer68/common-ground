@@ -100,3 +100,64 @@ Kvadratni crtež koji mobitel kamerom pretvori u link. Biblioteka `qrcodejs` ga 
 
 ### Viewport jedinice (`vh`, `vw`)
 `1vh` = 1% visine ekrana, `1vw` = 1% širine. Projektor koristi ove jedinice (`css/screen.css`), pa se slova sama povećaju ili smanje prema veličini platna.
+
+---
+
+## Faza 2: Mjerenje prije/poslije
+
+### Petlja aktivnosti
+Cijela aplikacija radi u krug: facilitator pokrene aktivnost → učesnici odgovore → projektor prikaže. U bazi to izgleda ovako:
+```
+sessions
+  └─ ROND
+       ├─ current      { activityId: "-Nx7a…" }            ← šta je sad uključeno (piše samo facilitator)
+       ├─ activities
+       │    └─ -Nx7a…  { type: "measure", phase: "before", revealed: false, config: {…} }
+       └─ responses
+            └─ -Nx7a…
+                 └─ before
+                      └─ xyz789: [2, 4]                    ← odgovor vezan za uid, nikad za nadimak
+```
+Sva tri ekrana slušaju `current`. Kad se promijeni, svaki ekran nacrta svoju verziju iste aktivnosti. Kod je u `js/activity-loop.js`.
+
+### Modul aktivnosti (plugin)
+Svaki tip aktivnosti je jedan fajl u `js/activities/`, npr. `measure.js`. Fajl ima nekoliko funkcija sa uvijek istim imenima: `setup` (forma za facilitatora), `host` (dugmad dok traje), `participant` (forma na mobitelu), `screen` (prikaz na projektoru). Petlja ne zna ništa o mjerenju; samo pogleda `type` i pozove odgovarajući modul. Zato se novi tip doda kao novi fajl + jedan red u `js/activities/index.js`.
+
+### Registar (`js/activities/index.js`)
+Spisak svih tipova: `{ measure }`. Kao imenik: petlja u njemu pronađe modul po imenu tipa. Facilitatorov ekran iz istog spiska pravi dugmad "Start a new activity".
+
+### Faza aktivnosti (`phase`)
+Ista aktivnost može imati više dijelova. Mjerenje ima `before` i `after`, sa **istim** tvrdnjama jer su spremljene samo jednom (u `config`). Pravila baze dozvoljavaju odgovor samo u fazi koja je trenutno uključena: kad facilitator klikne "Start After", više niko ne može mijenjati "Before" odgovore.
+
+### Reveal (`revealed`)
+Polje `true/false` na aktivnosti. Projektor dok je `false` crta samo broj odgovora ("7 of 12 answered"), a kad postane `true` crta prosjeke "3.1 → 4.2". Facilitator ga mijenja dugmetom.
+
+### Prosjek
+Zbir svih odgovora podijeljen brojem odgovora. Npr. odgovori 2 i 4 → (2 + 4) / 2 = 3.0. Funkcija `stats()` u `measure.js`. Prikazujemo jednu decimalu (`toFixed(1)`).
+
+### `push().key` (jedinstveni ID)
+`push(ref(db, "…/activities")).key` napravi novi jedinstveni ključ (npr. `-Nx7aB3…`) bez upisivanja ičega. Ključevi su poredani po vremenu i dva uređaja nikad ne dobiju isti.
+
+### Upis na više mjesta odjednom (multi-path update)
+`update(ref(db, "sessions/ROND"), { "activities/abc": {…}, "current": {…} })` upiše oboje u jednom koraku: ili uspije sve, ili ništa. Tako projektor nikad ne vidi `current` koji pokazuje na aktivnost koja još ne postoji. Isto koristimo kad pravimo sesiju (meta + PIN zajedno).
+
+### Host PIN i preuzimanje kontrole
+Kad se napravi sesija, nastane i PIN od 6 cifara u `sessions/ROND/hostPin`. Čitati ga može samo trenutni facilitator (pravila baze), pa ga projektor i učesnici nikad ne mogu vidjeti. Preuzimanje sa drugog uređaja ide u dva koraka (`takeOverSession` u `js/session.js`):
+1. Novi uređaj upiše svoj pokušaj u `pinAttempts/{svoj uid}`. Pravila to dozvoljavaju najviše jednom u 5 sekundi, da niko ne može brzo isprobati milion kombinacija.
+2. Novi uređaj upiše svoj uid u `meta/hostUid`. Pravilo to dozvoljava samo ako je pokušaj jednak PIN-u.
+Stari uređaj sluša `meta` i čim vidi tuđi uid, prikaže poruku da je kontrola prešla na drugi uređaj.
+
+### Pravila mogu čitati ono što korisnik ne smije
+Pravilo za `meta/hostUid` poredi pokušaj sa `hostPin`, iako novi uređaj `hostPin` ne smije čitati. Pravila se izvršavaju na serveru i vide cijelu bazu; korisnik dobije samo odgovor "da" ili "ne".
+
+### `newData.parent()`
+U pravilima, `newData` je podatak *kakav će biti* poslije upisa. `newData.parent()` je mjesto iznad njega. Primjer: pravilo za `current/activityId` provjerava `newData.parent().parent().child('activities')…` da aktivnost na koju pokazuje zaista postoji (i kad se pravi u istom upisu).
+
+### Emulator (testiranje pravila)
+Firebase ima "lažnu" bazu koja radi na računaru (Firebase Emulator). Na njoj smo isprobali pravila: npr. da učesnik ne može upisati 6 na skali od 1 do 5, da projektor ne može pročitati PIN, i da pogrešan PIN ne daje kontrolu. Prava baza se pri tome ne dira.
+
+### Radio dugmad kao velika dugmad
+Skala 1–5 na mobitelu su obična `<input type="radio">` polja (samo jedno se može izabrati), ali sakrivena; vidi se `<span>` pored njih, nacrtan kao veliko dugme. Tako je lako pritisnuti prstom, a čitači ekrana i dalje znaju da je to izbor (`css/app.css`, `.scale`).
+
+### `el()` pomoćnik
+`js/dom.js` pravi elemente iz JavaScripta: `el("p", { class: "hint", text: "Hello" })`. Tekst uvijek ide kao `textContent`, pa tvrdnja koju facilitator upiše nikad ne može postati kod na stranici.

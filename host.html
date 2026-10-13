@@ -10,13 +10,31 @@
   <main class="container">
     <p class="status" id="loading" data-i18n="common.loading"></p>
 
-    <section id="create" class="card" hidden>
-      <h1 data-i18n="host.title"></h1>
-      <p class="notice" id="create-notice" hidden></p>
-      <p data-i18n="host.intro"></p>
-      <button type="button" id="create-button" class="button" data-i18n="host.create"></button>
-      <p class="error" id="create-error" role="alert" hidden></p>
-    </section>
+    <div id="create" hidden>
+      <section class="card">
+        <h1 data-i18n="host.title"></h1>
+        <p class="notice" id="create-notice" hidden></p>
+        <p data-i18n="host.intro"></p>
+        <button type="button" id="create-button" class="button" data-i18n="host.create"></button>
+        <p class="error" id="create-error" role="alert" hidden></p>
+      </section>
+
+      <form id="takeover-form" class="card" novalidate>
+        <h2 data-i18n="host.takeoverTitle"></h2>
+        <p class="hint" data-i18n="host.takeoverIntro"></p>
+
+        <label for="takeover-code" data-i18n="participant.codeLabel"></label>
+        <input id="takeover-code" class="input-code" maxlength="4" autocomplete="off"
+               autocapitalize="characters" spellcheck="false" data-i18n-placeholder="participant.codePlaceholder">
+
+        <label for="takeover-pin" data-i18n="host.pin"></label>
+        <input id="takeover-pin" class="input-code" maxlength="6" autocomplete="off"
+               inputmode="numeric" pattern="[0-9]*" data-i18n-placeholder="host.pinPlaceholder">
+
+        <p class="error" id="takeover-error" role="alert" hidden></p>
+        <button type="submit" id="takeover-button" class="button button-secondary" data-i18n="host.takeover"></button>
+      </form>
+    </div>
 
     <section id="dashboard" hidden>
       <div class="card center">
@@ -28,9 +46,36 @@
       </div>
 
       <div class="card">
+        <h2 data-i18n="host.currentActivity"></h2>
+        <p class="hint" id="no-activity" data-i18n="host.noActivity"></p>
+        <div id="activity"></div>
+        <button type="button" id="end-activity" class="button button-secondary" data-i18n="host.endActivity" hidden></button>
+      </div>
+
+      <div class="card">
+        <div id="new-activity">
+          <h2 data-i18n="host.newActivity"></h2>
+          <div id="activity-types"></div>
+        </div>
+        <div id="activity-setup" hidden></div>
+      </div>
+
+      <div class="card">
+        <h2 data-i18n="host.earlierActivities"></h2>
+        <p class="hint" id="no-activities" data-i18n="host.noActivities"></p>
+        <ul class="activity-list" id="activities"></ul>
+      </div>
+
+      <div class="card">
         <h2 id="participants-title"></h2>
         <p class="hint" id="no-participants" data-i18n="host.noParticipants"></p>
         <ul class="nickname-list" id="participants"></ul>
+      </div>
+
+      <div class="card">
+        <p class="label" data-i18n="host.pin"></p>
+        <p class="pin" id="pin"></p>
+        <p class="hint" data-i18n="host.pinHint"></p>
       </div>
 
       <button type="button" id="new-session" class="button button-secondary" data-i18n="host.newSession"></button>

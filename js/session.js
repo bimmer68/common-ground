@@ -4,6 +4,9 @@
 //   sessions/{CODE}/meta              { hostUid, createdAt }  – who owns the session
 //   sessions/{CODE}/members/{uid}     true                    – used for counting (no names!)
 //   sessions/{CODE}/nicknames/{uid}   "nickname"              – only the facilitator can read
+//   sessions/{CODE}/hostPin           "123456"                – only the facilitator can read
+//   sessions/{CODE}/pinAttempts/{uid} { pin, at }             – a takeover try, nobody can read
+// Activities are in js/activity-store.js.
 import { db, ref, get, set, update, onValue, serverTimestamp } from "./firebase.js";
 
 // No I and O, so nobody confuses them with 1 and 0.
@@ -24,6 +27,16 @@ export function normalizeNickname(value) {
 
 export function isValidNickname(nickname) {
   return nickname.length >= 1 && nickname.length <= NICKNAME_MAX;
+}
+
+// 6 digits, e.g. "048213". Used to take over the session from another device.
+function randomPin() {
+  const n = crypto.getRandomValues(new Uint32Array(1))[0] % 1000000;
+  return String(n).padStart(6, "0");
+}
+
+export function isValidPin(pin) {
+  return /^[0-9]{6}$/.test(pin);
 }
 
 function randomCode() {
@@ -53,14 +66,19 @@ export async function getSessionMeta(code) {
   return snap.exists() ? snap.val() : null;
 }
 
-// Creates a new session owned by uid. The rules refuse to overwrite an
-// existing session, so if a code is taken we simply try another one.
+// Creates a new session owned by uid, together with its host PIN.
+// The rules refuse to overwrite an existing session, so if a code is taken
+// we simply try another one.
 export async function createSession(uid) {
+  const pin = randomPin();
   for (let attempt = 0; attempt < 10; attempt++) {
     const code = randomCode();
     if (await getSessionMeta(code)) continue;
     try {
-      await set(ref(db, path(code, "meta")), { hostUid: uid, createdAt: serverTimestamp() });
+      await update(ref(db, path(code)), {
+        meta: { hostUid: uid, createdAt: serverTimestamp() },
+        hostPin: pin
+      });
       return code;
     } catch (err) {
       // Someone took the same code in the same moment – try again.
@@ -68,6 +86,41 @@ export async function createSession(uid) {
     }
   }
   throw new Error("Could not create a session code");
+}
+
+// Facilitator only (the rules refuse everyone else).
+export async function getHostPin(code) {
+  const snap = await get(ref(db, path(code, "hostPin")));
+  return snap.val();
+}
+
+// Calls callback(meta) when the session's owner changes (e.g. taken over elsewhere).
+export function watchMeta(code, callback, onError) {
+  return onValue(ref(db, path(code, "meta")), (snap) => callback(snap.val()), onError);
+}
+
+const isDenied = (err) => String(err?.code || err?.message || "").toUpperCase().includes("PERMISSION_DENIED");
+
+// Take control of a session from this device with the code and the host PIN.
+// Two steps, both checked by the database rules:
+//   1. write our try into pinAttempts/{uid}  (allowed at most once every 5 seconds)
+//   2. write our uid into meta/hostUid        (allowed only if our try matches hostPin)
+// Returns "ok", "notFound", "wait" (too fast) or "wrongPin".
+export async function takeOverSession(code, uid, pin) {
+  if (!(await getSessionMeta(code))) return "notFound";
+  try {
+    await set(ref(db, path(code, `pinAttempts/${uid}`)), { pin, at: serverTimestamp() });
+  } catch (err) {
+    if (isDenied(err)) return "wait";
+    throw err;
+  }
+  try {
+    await set(ref(db, path(code, "meta/hostUid")), uid);
+  } catch (err) {
+    if (isDenied(err)) return "wrongPin";
+    throw err;
+  }
+  return "ok";
 }
 
 // Participant joins: nickname and membership are written together.

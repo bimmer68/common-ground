@@ -1,8 +1,10 @@
-// Participant page (index.html): enter code + nickname, then wait.
+// Participant page (index.html): enter code + nickname, then follow the
+// facilitator: the waiting card when nothing runs, otherwise the current activity.
 import { ensureSignedIn } from "./firebase.js";
 import { t, applyTranslations } from "./i18n.js";
 import { showConnectionBanner } from "./connection.js";
 import * as storage from "./storage.js";
+import { runActivityLoop } from "./activity-loop.js";
 import {
   NICKNAME_MAX, codeFromUrl, normalizeCode, isValidCode, normalizeNickname,
   isValidNickname, getSessionMeta, joinSession, isMember, getOwnNickname
@@ -11,8 +13,11 @@ import {
 const $ = (id) => document.getElementById(id);
 const STORAGE_KEY = "participant"; // { code, nickname }
 
+let uid = null;
+let stopLoop = null;
+
 function show(id) {
-  ["loading", "join-form", "waiting"].forEach((name) => { $(name).hidden = name !== id; });
+  ["loading", "join-form", "waiting", "activity"].forEach((name) => { $(name).hidden = name !== id; });
 }
 
 function showError(message) {
@@ -20,11 +25,19 @@ function showError(message) {
   $("join-error").hidden = !message;
 }
 
-function showWaiting(code, nickname) {
+function showJoined(code, nickname) {
   $("joined-as").textContent = t("participant.joinedAs", { nickname, code });
   show("waiting");
   // Keep the code in the address bar, so a refresh lands in the same session.
   history.replaceState(null, "", `?s=${code}`);
+
+  // Follow the facilitator: when they start an activity, its form appears here.
+  if (stopLoop) stopLoop();
+  stopLoop = runActivityLoop({
+    code, uid, role: "participant", container: $("activity"),
+    onChange: (id) => show(id ? "activity" : "waiting"),
+    onError: (err) => console.error(err)
+  });
 }
 
 async function start() {
@@ -41,6 +54,7 @@ async function start() {
     $("fatal-error").hidden = false;
     return;
   }
+  uid = user.uid;
 
   const saved = storage.load(STORAGE_KEY);
   const code = codeFromUrl() || saved?.code || "";
@@ -49,10 +63,10 @@ async function start() {
   // Firebase gives us the same uid after a refresh, so the database knows us.
   if (code) {
     try {
-      if (await isMember(code, user.uid)) {
-        const nickname = saved?.code === code ? saved.nickname : await getOwnNickname(code, user.uid);
+      if (await isMember(code, uid)) {
+        const nickname = saved?.code === code ? saved.nickname : await getOwnNickname(code, uid);
         storage.save(STORAGE_KEY, { code, nickname });
-        showWaiting(code, nickname);
+        showJoined(code, nickname);
         return;
       }
     } catch (err) {
@@ -67,11 +81,11 @@ async function start() {
 
   $("join-form").addEventListener("submit", (event) => {
     event.preventDefault();
-    join(user.uid);
+    join();
   });
 }
 
-async function join(uid) {
+async function join() {
   const code = normalizeCode($("code").value);
   const nickname = normalizeNickname($("nickname").value);
 
@@ -89,7 +103,7 @@ async function join(uid) {
     }
     await joinSession(code, uid, nickname);
     storage.save(STORAGE_KEY, { code, nickname });
-    showWaiting(code, nickname);
+    showJoined(code, nickname);
   } catch (err) {
     console.error(err);
     showError(t("common.error"));

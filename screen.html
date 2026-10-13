@@ -12,6 +12,15 @@
   <main class="screen">
     <p class="screen-message" id="message" data-i18n="common.loading"></p>
 
+    <!-- Shown when the page is opened without ?s=CODE. -->
+    <form id="enter-form" class="enter" hidden novalidate>
+      <label for="enter-code" data-i18n="screen.enterTitle"></label>
+      <input id="enter-code" maxlength="4" autocomplete="off" autocapitalize="characters"
+             spellcheck="false" data-i18n-placeholder="participant.codePlaceholder">
+      <p class="enter-error" id="enter-error" role="alert" hidden></p>
+      <button type="submit" id="enter-button" data-i18n="screen.show"></button>
+    </form>
+
     <section id="lobby" class="lobby" hidden>
       <div class="lobby-qr">
         <div id="qr" class="qr"></div>
@@ -23,6 +32,9 @@
         <p class="lobby-count" id="count"></p>
       </div>
     </section>
+
+    <!-- The current activity is drawn here by its module (js/activities/). -->
+    <section id="activity" class="screen-activity" hidden></section>
   </main>
   <script type="module" src="js/screen.js"></script>
 </body>
