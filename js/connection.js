@@ -7,6 +7,7 @@ export function showConnectionBanner() {
   const banner = document.createElement("div");
   banner.className = "connection-banner";
   banner.setAttribute("role", "status");
+  banner.dataset.i18n = "common.offline"; // so applyTranslations() can redraw it in a new language
   banner.textContent = t("common.offline");
   banner.hidden = true;
   document.body.prepend(banner);
