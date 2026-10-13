@@ -1,6 +1,9 @@
 // Timer on the projector (Faza 3).
 //
-//   sessions/{CODE}/timer   { startedAt, duration }   – only the facilitator writes
+//   sessions/{CODE}/timer   { startedAt, duration, big? }   – only the facilitator writes
+//
+// big = true: the timer fills the whole projector instead of sitting in the
+// corner (Faza 5), for exercises where the time is the main thing on screen.
 //
 // startedAt is written as serverTimestamp(): the DATABASE SERVER puts in its
 // own clock, not the phone's. duration is in seconds. Nothing else is stored:
@@ -13,7 +16,7 @@
 // serverNow() is "the server's time right now" (js/firebase.js), so all
 // screens get the same answer even if their own clocks are wrong, and even if
 // the facilitator's phone falls asleep: the projector doesn't need the phone.
-import { db, ref, set, onValue, serverTimestamp, serverNow } from "./firebase.js";
+import { db, ref, set, update, onValue, serverTimestamp, serverNow } from "./firebase.js";
 import { el } from "./dom.js";
 import { t } from "./i18n.js";
 
@@ -26,8 +29,13 @@ const TICK_MS = 200;
 
 const timerRef = (code) => ref(db, `sessions/${code}/timer`);
 
-export function startTimer(code, seconds) {
-  return set(timerRef(code), { startedAt: serverTimestamp(), duration: seconds });
+export function startTimer(code, seconds, big = false) {
+  return set(timerRef(code), { startedAt: serverTimestamp(), duration: seconds, big });
+}
+
+// Switch a running timer between the corner and the full screen.
+export function setTimerBig(code, big) {
+  return update(timerRef(code), { big });
 }
 
 export function stopTimer(code) {
@@ -89,6 +97,7 @@ export function timerDisplay({ el: root, code }) {
     root.hidden = false;
     root.classList.toggle("timer-ending", !done && left <= LAST_SECONDS * 1000);
     root.classList.toggle("timer-done", done);
+    root.classList.toggle("timer-big", timer.big === true);
     root.textContent = done ? t("timer.done") : formatTime(left);
   }
 
@@ -111,6 +120,10 @@ export function timerControls({ el: root, code, onError }) {
     placeholder: t("timer.customPlaceholder")
   });
   const error = el("p", { class: "error", role: "alert", hidden: true });
+  const big = el("input", {
+    type: "checkbox",
+    onchange: () => { if (timer) setTimerBig(code, big.checked).catch(fail); }
+  });
 
   function fail(err) {
     console.error(err);
@@ -120,7 +133,7 @@ export function timerControls({ el: root, code, onError }) {
 
   function start(seconds) {
     error.hidden = true;
-    startTimer(code, seconds).catch(fail);
+    startTimer(code, seconds, big.checked).catch(fail);
   }
 
   function startCustom(event) {
@@ -147,6 +160,8 @@ export function timerControls({ el: root, code, onError }) {
       el("div", { class: "inline-row" },
         custom,
         el("button", { type: "submit", class: "button button-small", text: t("timer.start") }))),
+    el("label", { class: "check" }, big, el("span", { text: t("timer.bigLabel") })),
+    el("p", { class: "hint", text: t("timer.bigHint") }),
     error,
     stop,
     el("p", { class: "hint", text: t("timer.hint") })
@@ -161,7 +176,11 @@ export function timerControls({ el: root, code, onError }) {
     if (visible) display.textContent = left <= 0 ? t("timer.done") : formatTime(left);
   }
 
-  const stopWatch = watchTimer(code, (v) => { timer = v; draw(); }, onError);
+  const stopWatch = watchTimer(code, (v) => {
+    timer = v;
+    if (timer) big.checked = timer.big === true; // the box always shows what the projector does
+    draw();
+  }, onError);
   const stopTicker = ticker(draw);
   return () => { stopWatch(); stopTicker(); root.replaceChildren(); };
 }

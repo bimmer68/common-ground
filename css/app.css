@@ -278,3 +278,59 @@ h3 { font-size: 1.05rem; margin: 20px 0 8px; }
 
 /* Time left on the facilitator's phone. */
 .timer-left { font-size: 2.6rem; font-weight: 800; margin: 0; text-align: center; }
+
+/* ---------- Faza 4 and 5: text answers ---------- */
+
+.add-button { margin-top: 12px; }
+.prompt-edit { border-top: 1px solid var(--border); margin-top: 12px; }
+
+/* My own texts on the phone, with Edit / Delete. */
+.my-texts { list-style: none; margin: 8px 0 0; padding: 0; }
+.my-text { border: 2px solid var(--border); border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; }
+.my-text-editing { border-color: var(--accent); }
+.my-text-body { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.my-text-status { margin: 6px 0 0; font-size: 0.9rem; font-weight: 700; color: var(--accent); }
+.text-counter { text-align: right; }
+.secret-label { border: 2px dashed var(--border); border-radius: 10px; margin: 12px 0 0; padding: 4px 12px 12px; }
+.secret-label legend { font-weight: 700; padding: 0 6px; font-size: 0.95rem; }
+.secret-label .check { margin: 10px 0 0; }
+
+/* Voting on wall cards. */
+.votes-left { font-weight: 700; margin: 8px 0; }
+.vote-cards { list-style: none; margin: 0; padding: 0; }
+.vote-card {
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.vote-card-chosen { border-color: var(--accent); background: #eef4f8; }
+.vote-card-text { margin: 0; overflow-wrap: anywhere; }
+.vote-card .button-small { align-self: flex-end; }
+
+/* The facilitator's lists of cards and words. */
+.host-cards,
+.word-list { list-style: none; margin: 8px 0 0; padding: 0; }
+.host-card { border-top: 1px solid var(--border); padding: 10px 0; }
+.host-card-text { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.host-card-hidden .host-card-text { color: var(--muted); text-decoration: line-through; }
+.host-card .button-row { margin-top: 6px; }
+.word-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-top: 1px solid var(--border);
+  overflow-wrap: anywhere;
+}
+.word-hidden span { color: var(--muted); text-decoration: line-through; }
+.spotlight-controls { border-top: 1px solid var(--border); margin-top: 20px; }
+
+/* "Who wrote this?" on the phone. */
+.guess-card { border: 3px solid var(--accent); }
+.guess-text { font-size: 1.3rem; font-weight: 700; overflow-wrap: anywhere; }
+.guess-answer { font-weight: 800; color: var(--accent); }
