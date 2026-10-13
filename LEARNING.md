@@ -331,3 +331,55 @@ U `css/report.css` dio `@media print { … }` važi samo kad se stranica štampa
 
 ### Pristup izvještaju
 `report.html?s=ROND` provjeri da li je uid ovog browsera jednak `meta/hostUid`. Ako nije, prikaže samo poruku. Novi tab u istom browseru ima isti anonimni uid, pa ga facilitator otvara dugmetom "Open report" sa svog ekrana.
+
+---
+
+## Faza 7: Jezici
+
+### Jedan fajl po jeziku
+Svaki jezik je svoj fajl u `js/i18n/`: `bs.js`, `ru.js`, `ar.js`… Svi imaju **iste ključeve** kao `en.js`, samo drugi tekst:
+```js
+// js/i18n/uk.js
+"participant.join": "Увійти",
+```
+U tim fajlovima su samo tekstovi koje vidi **učesnik** (88 tekstova). Tekstovi facilitatora, projektora i izvještaja su samo u `en.js`, jer ti ekrani uvijek ostaju na engleskom.
+
+### Spisak jezika (`js/i18n/languages.js`)
+Jedno mjesto gdje piše koji jezici postoje: oznaka jezika (`uk`), ime fajla i ime jezika. Ime je napisano **na tom jeziku i njegovim pismom** ("Українська", "العربية", "ქართული"), da ga osoba nađe i kad ne zna čitati ostale. Ova imena se ne prevode, pa nisu u jezičkim fajlovima.
+
+### Učitavanje samo izabranog jezika (`import()`)
+Obični `import … from` na vrhu fajla učita fajl uvijek. `await import("./i18n/uk.js")` učita fajl tek kad zatreba. Zato mobitel preuzme samo engleski i jezik koji je osoba izabrala, ne svih 13 (`setLanguage` u `js/i18n.js`).
+
+### Rezervni jezik (fallback)
+Ako u izabranom jeziku nekog teksta nema, `t()` uzme engleski tekst iz `en.js`:
+```js
+let text = strings[key];
+if (text == null) text = en[key] ?? key;
+```
+Tako novi tekst dodan samo u `en.js` nikad ne izađe kao `participant.join`, nego kao "Join", dok ga neko ne prevede.
+
+### Ko mijenja jezik, a ko ne
+`js/i18n.js` dijele sve stranice, a počinje uvijek na engleskom. Samo `js/participant.js` poziva `setLanguage(...)`. Projektor (`screen.html`), facilitator (`host.html`) i izvještaj (`report.html`) to nikad ne pozivaju, pa ostaju na engleskom, čak i u istom browseru u kojem je neko izabrao arapski.
+
+### Izbor jezika ostaje samo na mobitelu
+Izbor se pamti u localStorage-u (`commonGround.language`), isto kao nadimak. **Nikad** ne ide u bazu: ni uz odgovor, ni uz članstvo. U grupi su strane u sukobu, a jezik bi mogao otkriti osobu. Kao i kod nadimka: podatak koji nikad nije poslan ne može procuriti.
+
+### `lang` i `dir` na stranici
+Kad učesnik izabere jezik, `<html>` dobije npr. `lang="he" dir="rtl"`.
+- `lang` kaže browseru koji je jezik (pravilna slova, čitači ekrana, `Intl.PluralRules`).
+- `dir="rtl"` (right-to-left, zdesna nalijevo) za arapski i hebrejski **okreće cijeli raspored**: tekst je desno, skala 1–5 ide zdesna (1 desno, 5 lijevo), dugme "Edit" je desno od "Delete".
+
+### `start` / `end` umjesto `left` / `right`
+`text-align: right` ostaje desno i na arapskom, pa bi bilo pogrešno. `text-align: end` znači "na kraju reda": desno na engleskom, lijevo na arapskom (`css/app.css`, npr. brojač znakova `.text-counter`).
+
+### Tekst koji ima svoj smjer (`unicode-bidi: plaintext`, `dir="auto"`)
+Facilitator piše pitanja na engleskom. Na arapskoj stranici bi se rečenica "Peace for me is…" poravnala desno, a tačke bi "skočile" na pogrešnu stranu. Zato tekst facilitatora i učesnika sam odredi svoj smjer:
+- u CSS-u `unicode-bidi: plaintext` (pitanje, tvrdnja, kartica na zidu) – smjer se odredi po prvom slovu teksta;
+- na poljima za unos `dir="auto"` (nadimak, odgovor) – piše se arapski zdesna, engleski slijeva.
+Tekst se nikad ne prevodi, samo se prikazuje kako je napisan.
+
+### Množina u drugim jezicima
+`Intl.PluralRules("ru")` zna da ruski ima oblike "one", "few", "many". Mi smo u prevodima tekst sa brojem napisali tako da ne zavisi od oblika ("Можно отправить ещё: {count}."), pa je dovoljan jedan oblik za svaki jezik. Ako jezik u fajlu ipak ima `{ one, few, other }`, `t()` izabere pravi oblik.
+
+### Testiranje bez interneta (lažni Firebase)
+U okruženju gdje smo testirali, Firebase server nije bio dostupan. Zato je headless Chromium umjesto pravog Firebasea dobio mali "lažni" Firebase u memoriji (isti nazivi funkcija: `ref`, `get`, `onValue`…). Tako smo otvorili ekran učesnika u svih 13 jezika za svaku aktivnost i provjerili: nigdje se ne vidi ključ umjesto teksta, arapski i hebrejski su okrenuti, i u bazu se upisuje samo odgovor (npr. `[3, 5]`), nikad jezik.

@@ -10,15 +10,23 @@
   <main class="container">
     <p class="status" id="loading" data-i18n="common.loading"></p>
 
+    <!-- Interface language. The choice is kept only on this phone (localStorage),
+         never in the database. The options are filled in by js/participant.js. -->
+    <div id="language-picker" class="language-picker" hidden>
+      <label for="language" data-i18n="participant.language"></label>
+      <select id="language"></select>
+      <p class="hint" data-i18n="participant.languageHint"></p>
+    </div>
+
     <form id="join-form" class="card" hidden novalidate>
       <h1 data-i18n="participant.title"></h1>
 
       <label for="code" data-i18n="participant.codeLabel"></label>
-      <input id="code" name="code" class="input-code" maxlength="4" autocomplete="off"
+      <input id="code" name="code" class="input-code" maxlength="4" autocomplete="off" dir="ltr"
              autocapitalize="characters" spellcheck="false" data-i18n-placeholder="participant.codePlaceholder">
 
       <label for="nickname" data-i18n="participant.nicknameLabel"></label>
-      <input id="nickname" name="nickname" maxlength="24" autocomplete="off"
+      <input id="nickname" name="nickname" maxlength="24" autocomplete="off" dir="auto"
              data-i18n-placeholder="participant.nicknamePlaceholder">
       <p class="hint" data-i18n="participant.nicknameHint"></p>
 

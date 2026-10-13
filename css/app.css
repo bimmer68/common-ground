@@ -216,7 +216,7 @@ textarea:focus, select:focus { outline: none; border-color: var(--accent); }
   color: var(--muted);
   font-size: 0.8rem;
 }
-.scale-ends span:last-child { text-align: right; }
+.scale-ends span:last-child { text-align: end; } /* end = right, or left in Arabic / Hebrew */
 
 /* ---------- Faza 3: quick poll and timer ---------- */
 
@@ -290,7 +290,7 @@ h3 { font-size: 1.05rem; margin: 20px 0 8px; }
 .my-text-editing { border-color: var(--accent); }
 .my-text-body { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
 .my-text-status { margin: 6px 0 0; font-size: 0.9rem; font-weight: 700; color: var(--accent); }
-.text-counter { text-align: right; }
+.text-counter { text-align: end; }
 .secret-label { border: 2px dashed var(--border); border-radius: 10px; margin: 12px 0 0; padding: 4px 12px 12px; }
 .secret-label legend { font-weight: 700; padding: 0 6px; font-size: 0.95rem; }
 .secret-label .check { margin: 10px 0 0; }
@@ -343,3 +343,24 @@ h3 { font-size: 1.05rem; margin: 20px 0 8px; }
 .ground-card-passed .host-card-text::before { content: "✓ "; color: #1e7a3c; }
 .ground-history { margin: 6px 0 0; padding-left: 1.4em; font-size: 0.9rem; }
 .ground-history li { margin-bottom: 4px; overflow-wrap: anywhere; }
+
+/* ---------- Faza 7: languages ---------- */
+
+/* Language menu on the participant's phone. The globe helps someone who
+   can't read the current language to find it. */
+.language-picker { margin-bottom: 16px; }
+.language-picker label { margin-top: 0; }
+.language-picker label::before { content: "🌐 "; }
+
+/* Arabic and Hebrew turn the page around (<html dir="rtl">). Text written by
+   the facilitator or a participant keeps its own direction, so an English
+   statement still reads left to right inside an Arabic page. */
+.page-participant .poll-question-phone,
+.page-participant .statement legend,
+.page-participant .poll-option,
+.page-participant .my-text-body,
+.page-participant .vote-card-text,
+.page-participant .guess-text,
+.page-participant .secret-label .check span { unicode-bidi: plaintext; }
+/* Full width, so short and long statements line up the same way. */
+.page-participant .statement legend { width: 100%; }

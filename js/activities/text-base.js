@@ -104,7 +104,7 @@ export function textWriter(options) {
   const root = el("div", { class: "text-writer" });
   const listNode = el("ul", { class: "my-texts" });
   const input = el(multiline ? "textarea" : "input", {
-    id: `text-${round}`, maxlength: maxLength, rows: multiline ? 3 : null, autocomplete: "off",
+    id: `text-${round}`, maxlength: maxLength, rows: multiline ? 3 : null, autocomplete: "off", dir: "auto",
     oninput: () => { counter.textContent = t("text.chars", { count: input.value.length, max: maxLength }); }
   });
   const counter = el("p", { class: "hint text-counter" });

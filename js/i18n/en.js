@@ -1,5 +1,7 @@
-// All interface texts (English). Later, other languages get their own file
-// with the same keys. Never write interface text directly in HTML or logic.
+// All interface texts (English). Never write interface text directly in HTML or logic.
+// The participant's phone can also use another language: js/i18n/bs.js, ru.js…
+// (list in js/i18n/languages.js). Those files have only the texts a
+// participant sees; anything missing there is shown in English from here.
 // A text with a number can have a singular and a plural form:
 //   { one: "{count} vote", other: "{count} votes" }   (see js/i18n.js)
 export default {
@@ -29,6 +31,8 @@ export default {
   "participant.waitingTitleNamed": "You're in, {nickname}!",
   "participant.waitingText": "Wait for the facilitator to start the next activity.",
   "participant.joinedAs": "Session {code}",
+  "participant.language": "Language",
+  "participant.languageHint": "Your choice stays only on this phone.",
 
   // Projector (screen.html)
   "screen.title": "Common Ground – Screen",

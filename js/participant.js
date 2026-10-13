@@ -3,7 +3,9 @@
 // The nickname stays ONLY on this phone (localStorage). It is never sent to
 // the database, so nobody can link this person to their answers.
 import { ensureSignedIn } from "./firebase.js";
-import { t, applyTranslations } from "./i18n.js";
+import { t, applyTranslations, setLanguage } from "./i18n.js";
+import { LANGUAGES } from "./i18n/languages.js";
+import { el } from "./dom.js";
 import { showConnectionBanner } from "./connection.js";
 import * as storage from "./storage.js";
 import { runActivityLoop } from "./activity-loop.js";
@@ -14,12 +16,38 @@ import {
 
 const $ = (id) => document.getElementById(id);
 const STORAGE_KEY = "participant"; // { code, nickname } – only on this phone
+const LANGUAGE_KEY = "language";    // e.g. "uk" – only on this phone, never in the database
 
 let uid = null;
 let stopLoop = null;
+let joined = null; // { code, nickname } once in a session
 
 function show(id) {
   ["loading", "join-form", "waiting", "activity"].forEach((name) => { $(name).hidden = name !== id; });
+  // The language can be changed on the join form and while waiting, not in the middle of an activity.
+  $("language-picker").hidden = id !== "join-form" && id !== "waiting";
+}
+
+// The language menu: every language with its own name, in its own script.
+function setupLanguagePicker(selected) {
+  const select = $("language");
+  select.replaceChildren(...LANGUAGES.map((lang) =>
+    el("option", { value: lang.code, lang: lang.code, dir: lang.dir || "ltr", text: lang.name })));
+  select.value = selected;
+  select.addEventListener("change", async () => {
+    storage.save(LANGUAGE_KEY, select.value);
+    await setLanguage(select.value);
+    applyTranslations();
+    showError("");
+    if (joined) drawWaiting(joined.code, joined.nickname);
+  });
+}
+
+function drawWaiting(code, nickname) {
+  $("waiting-title").textContent = nickname
+    ? t("participant.waitingTitleNamed", { nickname })
+    : t("participant.waitingTitle");
+  $("joined-as").textContent = t("participant.joinedAs", { code });
 }
 
 function showError(message) {
@@ -28,10 +56,8 @@ function showError(message) {
 }
 
 function showJoined(code, nickname) {
-  $("waiting-title").textContent = nickname
-    ? t("participant.waitingTitleNamed", { nickname })
-    : t("participant.waitingTitle");
-  $("joined-as").textContent = t("participant.joinedAs", { code });
+  joined = { code, nickname };
+  drawWaiting(code, nickname);
   show("waiting");
   // Keep the code in the address bar, so a refresh lands in the same session.
   history.replaceState(null, "", `?s=${code}`);
@@ -46,6 +72,9 @@ function showJoined(code, nickname) {
 }
 
 async function start() {
+  // The language is chosen before anything is drawn, so the page appears in it at once.
+  const language = await setLanguage(storage.load(LANGUAGE_KEY));
+  setupLanguagePicker(language);
   applyTranslations();
   showConnectionBanner();
 
