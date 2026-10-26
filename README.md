@@ -22,9 +22,9 @@ Svaki "alat" (glasanje, oblak riječi, zid...) je samo drugačiji tip aktivnosti
 |---|---|---|
 | `index.html` | Učesnici, na mobitelu | Ulaz sa kodom sesije i nadimkom (nadimak ostaje samo na mobitelu), pa forma za trenutnu aktivnost |
 | `screen.html` | Projektor, na laptopu | Velika slova, čitljivo sa 8 metara, tamna pozadina, visok kontrast. Bez ikakvih kontrola |
-| `host.html` | Facilitator, na mobitelu | Pravljenje sesije, pokretanje aktivnosti, otkrivanje rezultata, odobravanje tekstova |
+| `host.html` | Facilitator, na mobitelu | Pravljenje sesije, pokretanje aktivnosti, otkrivanje rezultata, odobravanje tekstova. Gore stalna traka (kod, broj učesnika, šta je na projektoru, tajmer), kartica "Sada" sa jednim velikim dugmetom za sljedeći korak, ostalo sklopljeno |
 
-Projektor i facilitator su **namjerno odvojeni**: projektor prikazuje laptop, a sve što facilitator vidi prije odobravanja ne smije se pojaviti na projektoru.
+Projektor i facilitator su **namjerno odvojeni**: projektor prikazuje laptop, a sve što facilitator vidi prije odobravanja ne smije se pojaviti na projektoru. Raniju aktivnost facilitator može **otvoriti samo na mobitelu** ("Otvori", npr. da u pauzi odobri tekstove), a projektor se mijenja tek dugmetom **"Prikaži na projektoru"**.
 
 ---
 
@@ -73,7 +73,7 @@ const firebaseConfig = {
 Za svaku aktivnost facilitator bira da li se rezultati vide odmah ili tek kad klikne **Reveal**.
 
 1. **Mjerenje (prije/poslije):** ista pitanja na skali 1–5 na početku i na kraju radionice. Rezultati se ne prikazuju dok facilitator ne otkrije pomak ("Before: 3,1 → After: 4,2").
-2. **Brzo glasanje:** jedan alat sa više tipova pitanja: da/ne, izbor između opcija, tačno/netačno, ocjena 1–5. Projektor prikazuje stubiće.
+2. **Brzo glasanje:** jedan alat sa više tipova pitanja: da/ne, izbor između opcija, tačno/netačno, ocjena 1–5. Projektor prikazuje stubiće. Svako pitanje ima **tvrdnju** (vidi se dok ljudi pričaju) i neobavezno **pitanje za glasanje** (vidi se tek kad se otvori glasanje).
 3. **Oblak riječi:** kratki odgovori, a češće riječi su veće. Riječi se normalizuju (mala slova, bez razmaka na krajevima).
 4. **Zid sa glasanjem:** učesnici šalju kratak tekst, tekstovi se pojavljuju na projektoru, svi mogu glasati.
 5. **Moderisani zid:** isto kao zid, ali tekst ide prvo samo na facilitatorov ekran. Na projektor ide tek kad ga facilitator odobri.
@@ -86,9 +86,9 @@ Na kraju sesije facilitator otvara stranicu za izvještaj koja se može odštamp
 
 ## Jezici (zadnja faza)
 
-Učesnik bira jezik interfejsa na svom mobitelu. Projektor i facilitator su uvijek na engleskom. Odgovori se pišu na engleskom.
+Učesnik bira jezik interfejsa na svom mobitelu. Projektor je uvijek na engleskom. Facilitator bira bosanski, engleski ili italijanski (pamti se na njegovom uređaju), a izvještaj se može štampati na engleskom ili italijanskom. Odgovori se pišu na engleskom.
 
-Jezici: engleski, bosanski, srpski, italijanski, ruski, ukrajinski, azerbejdžanski, gruzijski, armenski, bambara, albanski, arapski, hebrejski. Arapski i hebrejski se pišu zdesna nalijevo, pa raspored mora pratiti `dir="rtl"`.
+Jezici učesnika: engleski, bosanski, srpski (latinica i ćirilica), italijanski, francuski, ruski, ukrajinski, azerbejdžanski, gruzijski, armenski, bambara, albanski, arapski, hebrejski. Arapski i hebrejski se pišu zdesna nalijevo, pa raspored mora pratiti `dir="rtl"`.
 
 ---
 
@@ -109,4 +109,8 @@ Jezici: engleski, bosanski, srpski, italijanski, ruski, ukrajinski, azerbejdžan
 5. **Zid sa glasanjem i moderisani zid.**
 6. **Izvještaj.**
 7. **Jezici** (13 jezika, RTL).
-8. **Metar zajedničkog tla** (obavezno): aktivnost "Common Ground" – tvrdnje sa najmanje 80% glasova "I can sign" (prag mijenja facilitator) idu na tablu i pune metar.
+8. **Metar zajedničkog tla** (obavezno): aktivnost "Common Ground" – tvrdnje sa najmanje 80% glasova "I can sign" (prag mijenja facilitator) idu na tablu i pune metar. Ko glasa "With a change" može anonimno napisati svoju izmjenu; facilitator je jednim klikom pušta kao novu verziju.
+
+## Testovi
+
+U folderu `tests/` su automatski testovi (pravila baze, prevodi i sva tri ekrana u browseru, na Firebase emulatoru). Kako ih pokrenuti piše u `tests/README.md`.

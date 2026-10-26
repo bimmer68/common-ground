@@ -22,11 +22,16 @@
 // question and only while its state is "voting".
 //
 // One question:  { type: "yesno" | "choice" | "truefalse" | "rating",
-//                  text, options? (only for "choice", 2–6), tag?, live }
+//                  text, question?, options? (only for "choice", 2–6), tag?, live }
+//   text      the STATEMENT: on the projector while people talk (state "statement")
+//   question  the QUESTION FOR VOTING: appears on the projector and the phones
+//             only when voting opens. Optional: without it the statement is
+//             used for everything, exactly as before (old templates too).
 //   live = true:  bars grow on the projector while people vote
 //   live = false: only the number of votes, bars after "Reveal"
-import { t } from "../i18n.js";
+import { t, tEn } from "../i18n.js";
 import { el, fill } from "../dom.js";
+import { actions, badge, fold, withHelp, setFoldOpen } from "../host-ui.js";
 import { watchMemberCount } from "../session.js";
 import { saveResponse, getOwnResponse, watchResponses, updateActivity } from "../activity-store.js";
 import { saveTemplate, loadTemplate, rememberedTemplates } from "../templates.js";
@@ -46,16 +51,21 @@ function questionsOf(act) {
   return list(act.config?.questions);
 }
 
-// The answer buttons of a question. Fixed types get their texts from en.js,
-// so they will be translated on the phones later.
-function optionsOf(question) {
+// The answer buttons of a question. Fixed types get their texts from the
+// language files, so every phone shows them in its own language.
+// translate = tEn gives the English texts: Compare saves the option in
+// English (the projector is in English), whatever the facilitator's language.
+function optionsOf(question, translate = t) {
   switch (question?.type) {
-    case "yesno": return [t("poll.yes"), t("poll.no")];
-    case "truefalse": return [t("poll.true"), t("poll.false")];
+    case "yesno": return [translate("poll.yes"), translate("poll.no")];
+    case "truefalse": return [translate("poll.true"), translate("poll.false")];
     case "rating": return ["1", "2", "3", "4", "5"];
     default: return list(question?.options).map(String);
   }
 }
+
+// The question for voting, or the statement if there is none.
+const askOf = (question) => question?.question || question?.text || "";
 
 // "q3" -> 3
 function indexOf(act) {
@@ -107,7 +117,7 @@ function previousStep(act) {
 function nextLabel(act, questions) {
   const question = questions[indexOf(act)];
   const state = act.state === "compare" ? "results" : act.state;
-  if (state === "statement") return t("poll.next.openVoting");
+  if (state === "statement") return t(question?.question ? "poll.next.showQuestion" : "poll.next.openVoting");
   if (state === "voting") return t(question?.live ? "poll.next.closeVoting" : "poll.next.reveal");
   return indexOf(act) + 1 < questions.length ? t("poll.next.nextQuestion") : t("poll.next.end");
 }
@@ -125,10 +135,10 @@ function tagsOf(questions) {
 }
 
 // Every option text used by tagged questions (for the "compare which option?" list).
-function compareOptionsOf(questions) {
+function compareOptionsOf(questions, translate = t) {
   const seen = new Map();
   questions.filter((q) => clean(q.tag)).forEach((q) => {
-    optionsOf(q).forEach((label) => { if (!seen.has(key(label))) seen.set(key(label), label); });
+    optionsOf(q, translate).forEach((label) => { if (!seen.has(key(label))) seen.set(key(label), label); });
   });
   return [...seen.values()];
 }
@@ -153,12 +163,14 @@ function compareData(questions, responses, option) {
 
 // ---------- Facilitator: preparing the list of questions ----------
 
+let nextKey = 0; // a stable id for every question in the editor (keeps its "More options" open or closed)
+
 function emptyQuestion(type = "yesno") {
-  return { type, text: "", options: ["", ""], tag: "", live: false };
+  return { key: nextKey++, type, text: "", question: "", options: ["", ""], tag: "", live: false };
 }
 
 // Turns the form into what is saved: trimmed texts, options only for "choice",
-// no empty tag. Returns { config } or { error }.
+// no empty tag or question. Returns { config } or { error }.
 function buildConfig(title, questions) {
   const out = [];
   if (!questions.length) return { error: t("poll.errorNoQuestions") };
@@ -168,6 +180,9 @@ function buildConfig(title, questions) {
     const text = clean(q.text);
     if (!text || text.length > LIMITS.text) return { error: t("poll.errorText", { n, max: LIMITS.text }) };
     const item = { type: q.type, text, live: !!q.live };
+    const ask = clean(q.question);
+    if (ask.length > LIMITS.text) return { error: t("poll.errorQuestion", { n, max: LIMITS.text }) };
+    if (ask) item.question = ask;
     if (q.type === "choice") {
       const options = q.options.map(clean);
       if (options.length < LIMITS.minOptions || options.length > LIMITS.maxOptions
@@ -187,10 +202,13 @@ function buildConfig(title, questions) {
 }
 
 // A saved list (template or activity) back into editable form.
+// Old templates have no "question": the field is simply empty.
 function fromConfig(config) {
   return questionsOf({ config }).map((q) => ({
+    key: nextKey++,
     type: TYPES.includes(q.type) ? q.type : "yesno",
     text: q.text || "",
+    question: q.question || "",
     options: q.type === "choice" ? list(q.options).map(String) : ["", ""],
     tag: q.tag || "",
     live: !!q.live
@@ -241,13 +259,13 @@ function setup({ el: root, uid, onStart, onCancel }) {
           onclick: () => { q.options.splice(k, 1); draw(); }
         }))),
       q.options.length < LIMITS.maxOptions && el("button", {
-        type: "button", class: "button button-small button-secondary", text: t("poll.addOption"),
+        type: "button", class: "button button-small button-secondary add-button", text: t("poll.addOption"),
         onclick: () => { q.options.push(""); draw(); }
       }));
 
     return el("fieldset", { class: "poll-edit" },
       el("legend", { text: t("poll.questionN", { n: i + 1 }) }),
-      el("div", { class: "button-row" },
+      el("div", { class: "poll-edit-tools" },
         el("button", { type: "button", class: "button button-small button-secondary", text: "↑", "aria-label": t("poll.moveUp"), disabled: i === 0, onclick: () => move(-1) }),
         el("button", { type: "button", class: "button button-small button-secondary", text: "↓", "aria-label": t("poll.moveDown"), disabled: i === questions.length - 1, onclick: () => move(1) }),
         el("button", {
@@ -260,20 +278,27 @@ function setup({ el: root, uid, onStart, onCancel }) {
         id: `${id}-type`,
         onchange: (event) => { q.type = event.target.value; draw(); }
       }, TYPES.map((type) => el("option", { value: type, text: t(`poll.type.${type}`), selected: type === q.type }))),
-      el("label", { for: `${id}-text`, text: t("poll.textLabel") }),
+      withHelp(el("label", { for: `${id}-text`, text: t("poll.textLabel") }), t("poll.textHelp")),
       el("textarea", {
         id: `${id}-text`, rows: 2, maxlength: LIMITS.text, value: q.text,
         oninput: (event) => { q.text = event.target.value; }
       }),
-      options,
-      el("label", { for: `${id}-tag`, text: t("poll.tagLabel") }),
-      el("input", {
-        id: `${id}-tag`, maxlength: LIMITS.tag, value: q.tag, placeholder: t("poll.tagPlaceholder"),
-        oninput: (event) => { q.tag = event.target.value; }
+      withHelp(el("label", { for: `${id}-question`, text: t("poll.questionLabel") }), t("poll.questionHelp")),
+      el("textarea", {
+        id: `${id}-question`, rows: 2, maxlength: LIMITS.text, value: q.question, placeholder: t("poll.questionPlaceholder"),
+        oninput: (event) => { q.question = event.target.value; }
       }),
-      el("label", { class: "check" },
-        el("input", { type: "checkbox", checked: q.live, onchange: (event) => { q.live = event.target.checked; } }),
-        el("span", { text: t("poll.liveLabel") })));
+      options,
+      fold(`poll-more-${q.key}`, t("host.moreOptions"), [
+        withHelp(el("label", { for: `${id}-tag`, text: t("poll.tagLabel") }), t("poll.tagHelp")),
+        el("input", {
+          id: `${id}-tag`, maxlength: LIMITS.tag, value: q.tag, placeholder: t("poll.tagPlaceholder"),
+          oninput: (event) => { q.tag = event.target.value; }
+        }),
+        el("label", { class: "check" },
+          el("input", { type: "checkbox", checked: q.live, onchange: (event) => { q.live = event.target.checked; } }),
+          el("span", { text: t("poll.liveLabel") }))
+      ], { className: "fold-inner", open: !!(q.tag || q.live) }));
   }
 
   // ----- Templates: save the list and use it again in another session -----
@@ -318,14 +343,8 @@ function setup({ el: root, uid, onStart, onCancel }) {
 
   function templateSection() {
     const mine = rememberedTemplates("poll");
-    return el("div", { class: "poll-templates" },
-      el("h3", { text: t("poll.templatesTitle") }),
+    return fold("poll-templates", t("poll.templatesTitle"), [
       el("p", { class: "hint", text: t("poll.templatesHint") }),
-      el("button", {
-        type: "button", class: "button button-secondary",
-        text: t(template && template.ownerUid === uid ? "poll.templateUpdate" : "poll.templateSave"),
-        onclick: save
-      }),
       mine.length > 0 && el("p", { class: "label", text: t("poll.templatesMine") }),
       mine.length > 0 && el("ul", { class: "activity-list" }, mine.map((saved) => el("li", {},
         el("span", { text: `${saved.title} · ${saved.code}` }),
@@ -342,10 +361,17 @@ function setup({ el: root, uid, onStart, onCancel }) {
       el("label", { for: "poll-template-code", text: t("poll.templateCodeLabel") }),
       el("div", { class: "inline-row" },
         templateCode,
-        el("button", { type: "submit", class: "button button-small", text: t("poll.templateLoad") }))));
+        el("button", { type: "submit", class: "button button-small", text: t("poll.templateLoad") }))),
+      el("button", {
+        type: "button", class: "button button-secondary",
+        text: t(template && template.ownerUid === uid ? "poll.templateUpdate" : "poll.templateSave"),
+        onclick: save
+      }),
+      message
+    ], { className: "fold-inner", badge: template ? badge(template.code, "info") : null });
   }
 
-  const startButton = el("button", { type: "button", class: "button", text: t("poll.start") });
+  const startButton = el("button", { type: "button", class: "button button-primary", text: t("poll.start") });
   startButton.addEventListener("click", async () => {
     const built = buildConfig(title, questions);
     if (built.error) return fail(built.error);
@@ -362,8 +388,8 @@ function setup({ el: root, uid, onStart, onCancel }) {
 
   function draw() {
     fill(root,
-      el("h2", { text: t("poll.name") }),
-      el("p", { class: "hint", text: t("poll.setupHint") }),
+      withHelp(el("h2", { text: t("poll.name") }), t("poll.setupHint")),
+      templateSection(),
       el("label", { for: "poll-title", text: t("poll.titleLabel") }),
       el("input", {
         id: "poll-title", maxlength: LIMITS.title, value: title, placeholder: t("poll.titlePlaceholder"),
@@ -375,11 +401,10 @@ function setup({ el: root, uid, onStart, onCancel }) {
           type: "button", class: "button button-small button-secondary", text: t("poll.addType", { type: t(`poll.type.${type}`) }),
           onclick: () => { questions.push(emptyQuestion(type)); draw(); }
         }))),
-      templateSection(),
-      message,
-      error,
-      startButton,
-      el("button", { type: "button", class: "button button-secondary", text: t("common.cancel"), onclick: onCancel })
+      el("div", { class: "setup-start" },
+        error,
+        startButton,
+        el("button", { type: "button", class: "button button-secondary", text: t("common.cancel"), onclick: onCancel }))
     );
   }
 
@@ -394,11 +419,15 @@ function describe(activity) {
 }
 
 // ---------- Facilitator: Next / Back while it runs ----------
-function host({ el: root, code, activityId, activity }) {
+// ONE big button for the next step (open voting, close voting, next
+// question…), smaller ones for Back, "Go to question" and Compare.
+// ctx.end(): the facilitator's "End activity" (after the last question).
+function host({ el: root, code, activityId, activity, end }) {
   let act = activity;
   let responses = {};
   let members = 0;
-  let compareChoice = null;
+  let compareChoice = null; // English text of the option (as the projector shows it)
+  let jumpOpen = false;
 
   async function change(fields) {
     try {
@@ -408,6 +437,8 @@ function host({ el: root, code, activityId, activity }) {
       alert(t("common.error"));
     }
   }
+
+  const STATE_BADGE = { statement: "info", voting: "live", results: "done", compare: "done" };
 
   function draw() {
     const questions = questionsOf(act);
@@ -419,56 +450,75 @@ function host({ el: root, code, activityId, activity }) {
     const next = nextStep(act, questions.length);
     const back = previousStep(act);
     const tags = tagsOf(questions);
-    const compareOptions = compareOptionsOf(questions);
-    if (!compareOptions.some((o) => key(o) === key(compareChoice))) compareChoice = compareOptions[0] || null;
+    // Compare: values in English (what the projector shows), labels in the facilitator's language.
+    const compareValues = compareOptionsOf(questions, tEn);
+    const compareLabels = compareOptionsOf(questions, t);
+    if (!compareValues.some((o) => key(o) === key(compareChoice))) {
+      compareChoice = compareValues.find((o) => key(o) === key(act.compare)) || compareValues[0] || null;
+    }
+    const state = STATE_BADGE[act.state] ? act.state : "statement";
 
     // The facilitator always sees the numbers on their phone (never projected).
     const bars = el("ul", { class: "poll-mini" }, options.map((label, k) => el("li", {},
       el("span", { text: label }),
       el("span", { text: `${counts[k]} · ${percent(counts[k], votes)}%` }))));
 
-    const compare = !tags.length ? null : el("div", { class: "poll-compare-controls" },
-      el("h3", { text: t("poll.compareTitle") }),
+    const jump = jumpOpen && el("ul", { class: "jump-list" }, questions.map((q, k) => el("li", {},
+      el("button", {
+        type: "button", "aria-current": k === i ? "true" : null, text: `${k + 1}. ${q.text}`,
+        onclick: () => { jumpOpen = false; change({ phase: `q${k}`, state: "statement" }); }
+      }))));
+
+    const compare = !tags.length ? null : fold("poll-compare", t("poll.compareTitle"), [
       el("p", { class: "hint", text: t("poll.compareHint", { tags: tags.join(" · ") }) }),
       el("label", { for: "poll-compare-option", text: t("poll.compareOption") }),
       el("select", {
         id: "poll-compare-option",
         onchange: (event) => { compareChoice = event.target.value; }
-      }, compareOptions.map((o) => el("option", { value: o, text: o, selected: key(o) === key(compareChoice) }))),
+      }, compareValues.map((o, k) => el("option", { value: o, text: compareLabels[k] ?? o, selected: key(o) === key(compareChoice) }))),
       act.state === "compare"
         ? el("button", {
-          type: "button", class: "button", text: t("poll.compareUpdate"),
+          type: "button", class: "button button-secondary", text: t("poll.compareUpdate"),
           onclick: () => change({ compare: compareChoice })
         })
         : el("button", {
           type: "button", class: "button button-secondary", text: t("poll.compareShow"),
           onclick: () => change({ state: "compare", compare: compareChoice })
-        }));
+        })
+    ], { className: "fold-inner", open: act.state === "compare" });
+
+    // After the last question the big button ends the activity.
+    const primary = next
+      ? { text: nextLabel(act, questions), onclick: () => change(next) }
+      : { text: t("poll.next.endActivity"), onclick: () => end?.() };
 
     fill(root,
       el("h2", { text: act.config?.title || t("poll.name") }),
-      el("p", { class: "label", text: t("poll.questionOf", { n: i + 1, total: questions.length }) }),
-      el("p", { class: "poll-host-question", text: question.text || "" }),
-      question.tag && el("p", { class: "hint", text: t("poll.tagShown", { tag: question.tag }) }),
-      el("p", { class: "phase-now", text: t(`poll.state.${act.state}`) }),
-      el("p", { class: "count count-active", text: t("poll.voted", { count: votes, total: members }) }),
+      act.config?.title && el("p", { class: "label", text: act.config.title }),
+      el("div", { class: "host-state" },
+        el("span", { class: "phase-now", text: t("poll.questionOf", { n: i + 1, total: questions.length }) }),
+        badge(t(`poll.state.${state}`), STATE_BADGE[state]),
+        question.tag && badge(t("poll.tagShown", { tag: question.tag }), "info")),
+      el("div", { class: "host-question" },
+        question.question && el("p", { class: "label", text: t("poll.statementShort") }),
+        el("p", { class: question.question ? "host-statement-small" : "poll-host-question", text: question.text || "" }),
+        question.question && el("p", { class: "label", text: t("poll.questionShort") }),
+        question.question && el("p", { class: "poll-host-question", text: question.question })),
+      withHelp(el("p", { class: "count count-active", text: t("poll.voted", { count: votes, total: members }) }),
+        t(question.live ? "poll.liveNote" : "poll.revealNote")),
       bars,
-      el("p", { class: "hint", text: t(question.live ? "poll.liveNote" : "poll.revealNote") }),
-      el("button", {
-        type: "button", class: "button", text: nextLabel(act, questions), disabled: !next,
-        onclick: () => next && change(next)
+      actions({
+        primary,
+        secondary: [
+          { text: t("poll.back"), disabled: !back, onclick: () => back && change(back) },
+          { text: `${t("poll.jump")} ${jumpOpen ? "▴" : "▾"}`, pressed: jumpOpen, onclick: () => { jumpOpen = !jumpOpen; draw(); } },
+          tags.length > 0 && act.state !== "compare" && {
+            text: t("poll.compareShort"),
+            onclick: () => { setFoldOpen("poll-compare", true); change({ state: "compare", compare: compareChoice }); }
+          }
+        ]
       }),
-      el("button", {
-        type: "button", class: "button button-secondary", text: t("poll.back"), disabled: !back,
-        onclick: () => back && change(back)
-      }),
-      el("label", { for: "poll-jump", text: t("poll.jump") }),
-      el("select", {
-        id: "poll-jump",
-        onchange: (event) => change({ phase: `q${event.target.value}`, state: "statement" })
-      }, questions.map((q, k) => el("option", {
-        value: String(k), text: `${k + 1}. ${q.text}`, selected: k === i
-      }))),
+      jump,
       compare
     );
   }
@@ -527,13 +577,19 @@ function participant({ el: root, code, uid, activityId, activity }) {
     const phase = `q${i}`;
     const options = optionsOf(question);
     const label = el("p", { class: "label", text: t("poll.questionOf", { n: i + 1, total: questions.length }) });
-    const text = el("h1", { class: "poll-question-phone", text: question.text || "" });
 
     if (act.state === "statement") {
-      root.replaceChildren(el("section", { class: "card" }, label, text,
+      root.replaceChildren(el("section", { class: "card" }, label,
+        el("h1", { class: "poll-question-phone", text: question.text || "" }),
         el("p", { class: "hint", text: t("poll.waitVoting") })));
       return;
     }
+
+    // From voting on: the question for voting, with the statement small above it.
+    const text = [
+      question.question && el("p", { class: "poll-context-phone", text: question.text || "" }),
+      el("h1", { class: "poll-question-phone", text: askOf(question) })
+    ];
 
     if (!(phase in mine)) {
       loadMine(phase);
@@ -595,14 +651,19 @@ function screen({ el: root, code, activityId, activity }) {
       average != null && el("p", { class: "poll-average", text: t("poll.average", { value: average.toFixed(1) }) }));
   }
 
+  // Compare: for every tag, the % of all its votes that went to one option.
+  // Under every number: the full text of the option, so nobody has to guess
+  // what the % means ("of votes: Yes").
   function drawCompare(questions) {
     const option = act.compare || compareOptionsOf(questions)[0] || "";
-    root.replaceChildren(el("div", { class: "poll-compare" },
-      compareData(questions, responses, option).map((row) => el("div", { class: "poll-compare-col" },
-        el("div", { class: "poll-compare-tag", text: row.tag }),
-        el("div", { class: "poll-compare-pct", text: row.pct == null ? t("measure.noValue") : `${row.pct}%` }),
-        el("div", { class: "poll-compare-option", text: option }),
-        el("div", { class: "poll-compare-n", text: t("poll.votes", { count: row.total }) })))));
+    root.replaceChildren(el("div", { class: "poll-compare-view" },
+      el("p", { class: "poll-compare-title", text: t("poll.screenCompareTitle", { option }) }),
+      el("div", { class: "poll-compare" },
+        compareData(questions, responses, option).map((row) => el("div", { class: "poll-compare-col" },
+          el("div", { class: "poll-compare-tag", text: row.tag }),
+          el("div", { class: "poll-compare-pct", text: row.pct == null ? t("measure.noValue") : `${row.pct}%` }),
+          el("div", { class: "poll-compare-option", text: t("poll.compareOf", { option }) }),
+          el("div", { class: "poll-compare-n", text: t("poll.compareN", { hits: row.hits, count: row.total }) }))))));
   }
 
   function draw() {
@@ -618,7 +679,11 @@ function screen({ el: root, code, activityId, activity }) {
       return;
     }
 
-    const parts = [el("p", { class: "poll-question", text: question.text || "" })];
+    // From voting on: the question for voting (the statement small above it).
+    const parts = [
+      question.question && el("p", { class: "poll-context", text: question.text || "" }),
+      el("p", { class: "poll-question", text: askOf(question) })
+    ].filter(Boolean);
     if (act.state === "voting") {
       parts.push(el("p", { class: "poll-instruction", text: t("poll.screenVote") }));
       if (question.live) parts.push(barChart(question, counts));
@@ -654,6 +719,7 @@ function report({ activity, responses }) {
       const average = question.type === "rating" ? ratingAverage(counts) : null;
       return el("div", { class: "report-item" },
         el("p", { class: "report-question", text: `${i + 1}. ${question.text || ""}` }),
+        question.question && el("p", { class: "report-ask", text: t("report.questionForVoting", { question: question.question }) }),
         el("p", { class: "report-meta" }, [
           t(`poll.type.${question.type}`),
           question.tag ? t("report.tag", { tag: question.tag }) : null,
@@ -683,7 +749,9 @@ function report({ activity, responses }) {
 }
 
 export default {
-  name: "poll.name", // i18n key for the "start new activity" button
+  name: "poll.name",   // i18n key: the name of the type
+  short: "poll.short", // i18n key: short name for the tile on the facilitator's phone
+  icon: "🗳️",
   setup,
   describe,
   host,

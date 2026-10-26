@@ -10,6 +10,8 @@
 //
 // A module view is a function  view(ctx) -> { update(activity)?, destroy()? }
 // ctx = { el, code, uid, activityId, activity }
+// On the facilitator's page ctx also has end(): ends the activity (after a
+// confirmation), so a module can offer "End" as its last step.
 import { watchCurrent, watchActivity } from "./activity-store.js";
 import { activityTypes } from "./activities/index.js";
 import { el } from "./dom.js";
@@ -20,9 +22,36 @@ import { t } from "./i18n.js";
 // (waiting card, QR lobby) when nothing is running.
 export function runActivityLoop({ code, uid, role, container, onChange, onError }) {
   let currentId; // undefined until the first answer from the database, so idle (null) is reported too
-  let stopActivity = null;
+  let stopView = null;
+
+  const stopCurrent = watchCurrent(code, (id) => {
+    if (id === currentId) return;
+    if (stopView) stopView();
+    stopView = null;
+    container.replaceChildren();
+    currentId = id;
+    onChange(id);
+    if (!id) return;
+    stopView = activityView({ code, uid, role, container, id, onError });
+  }, onError);
+
+  return function stop() {
+    stopCurrent();
+    if (stopView) stopView();
+    container.replaceChildren();
+  };
+}
+
+// Draws ONE activity (by id) with its module and keeps it up to date, no
+// matter whether it is the current one. The loop above uses it for the
+// current activity; the facilitator's page also uses it to open an earlier
+// activity only on the phone ("Open"), without touching the projector.
+// extra: more fields for the module's view (the host page passes end()).
+// onActivity(activity or null): called on every change, before drawing.
+export function activityView({ code, uid, role, container, id, onError, extra = {}, onActivity = null }) {
   let view = null;
   let viewType = null;
+  let stopped = false;
 
   function clearView() {
     if (view?.destroy) view.destroy();
@@ -31,7 +60,7 @@ export function runActivityLoop({ code, uid, role, container, onChange, onError 
     container.replaceChildren();
   }
 
-  function draw(id, activity) {
+  function draw(activity) {
     const module = activityTypes[activity.type];
     if (!module || !module[role]) {
       clearView();
@@ -45,27 +74,19 @@ export function runActivityLoop({ code, uid, role, container, onChange, onError 
     }
     clearView();
     viewType = activity.type;
-    view = module[role]({ el: container, code, uid, activityId: id, activity }) || {};
+    view = module[role]({ ...extra, el: container, code, uid, activityId: id, activity }) || {};
   }
 
-  const stopCurrent = watchCurrent(code, (id) => {
-    if (id === currentId) return;
-    if (stopActivity) stopActivity();
-    stopActivity = null;
-    clearView();
-    currentId = id;
-    onChange(id);
-    if (!id) return;
-    stopActivity = watchActivity(code, id, (activity) => {
-      if (id !== currentId) return;
-      if (activity) draw(id, activity);
-      else clearView();
-    }, onError);
+  const stopActivity = watchActivity(code, id, (activity) => {
+    if (stopped) return;
+    if (onActivity) onActivity(activity);
+    if (activity) draw(activity);
+    else clearView();
   }, onError);
 
   return function stop() {
-    stopCurrent();
-    if (stopActivity) stopActivity();
+    stopped = true;
+    stopActivity();
     clearView();
   };
 }

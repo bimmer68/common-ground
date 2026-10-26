@@ -24,6 +24,7 @@
 // some functions here are exported.
 import { t } from "../i18n.js";
 import { el, fill } from "../dom.js";
+import { actions, badge, fold, withHelp } from "../host-ui.js";
 import { updateActivity } from "../activity-store.js";
 import { watchPosts, watchVotes, setVote, setHidden, tallyVotes } from "../text-store.js";
 import {
@@ -64,7 +65,7 @@ export function wallSetup({ el: root, onStart, onCancel, name, hint, extraFields
   const error = el("p", { class: "error", role: "alert", hidden: true });
   const fail = (text) => { error.textContent = text; error.hidden = !text; };
 
-  const startButton = el("button", { type: "button", class: "button", text: t("wall.start") });
+  const startButton = el("button", { type: "button", class: "button button-primary", text: t("wall.start") });
   startButton.addEventListener("click", async () => {
     const prompt = clean(config.prompt);
     if (!prompt || prompt.length > LIMITS.prompt) return fail(t("wall.errorPrompt", { max: LIMITS.prompt }));
@@ -86,22 +87,24 @@ export function wallSetup({ el: root, onStart, onCancel, name, hint, extraFields
   });
 
   fill(root,
-    el("h2", { text: t(name) }),
-    el("p", { class: "hint", text: t(hint) }),
+    withHelp(el("h2", { text: t(name) }), t(hint)),
     el("label", { for: "wall-prompt", text: t("wall.promptLabel") }),
     el("textarea", {
       id: "wall-prompt", rows: 2, maxlength: LIMITS.prompt, placeholder: t("wall.promptPlaceholder"),
       oninput: (event) => { config.prompt = event.target.value; }
     }),
-    numberSelect("wall-per-person", t("text.perPersonLabel"), PER_PERSON, config.perPerson, (n) => { config.perPerson = n; }),
-    el("p", { class: "hint", text: t("wall.textHint", { max: LIMITS.text }) }),
-    numberSelect("wall-votes", t("wall.votesLabel"), VOTES, config.votes, (n) => { config.votes = n; }),
-    checkbox(t("wall.liveLabel"), config.live, (v) => { config.live = v; }),
-    checkbox(t("wall.groupsLabel"), config.groups, (v) => { config.groups = v; }),
-    extraFields,
-    error,
-    startButton,
-    el("button", { type: "button", class: "button button-secondary", text: t("common.cancel"), onclick: onCancel }));
+    fold(`${name}-more`, t("host.moreOptions"), [
+      numberSelect("wall-per-person", t("text.perPersonLabel"), PER_PERSON, config.perPerson, (n) => { config.perPerson = n; }),
+      el("p", { class: "hint", text: t("wall.textHint", { max: LIMITS.text }) }),
+      numberSelect("wall-votes", t("wall.votesLabel"), VOTES, config.votes, (n) => { config.votes = n; }),
+      checkbox(t("wall.liveLabel"), config.live, (v) => { config.live = v; }),
+      checkbox(t("wall.groupsLabel"), config.groups, (v) => { config.groups = v; }),
+      extraFields
+    ], { className: "fold-inner" }),
+    el("div", { class: "setup-start" },
+      error,
+      startButton,
+      el("button", { type: "button", class: "button button-secondary", text: t("common.cancel"), onclick: onCancel })));
 }
 
 function setup(ctx) {
@@ -113,21 +116,25 @@ function describe(activity) {
 }
 
 // ---------- Facilitator: writing → voting → results ----------
-// Buttons to move between the three states (shared with the moderated wall).
-export function stateButtons(act, change) {
+// The state as a coloured badge, the big button for the next state and a
+// small "Back" (shared with the moderated wall). After "results" the big
+// button ends the activity (end() from the facilitator's page).
+const STATE_BADGE = { writing: "live", voting: "live", results: "done" };
+
+export function stateButtons(act, change, end, extraSecondary = []) {
   const i = Math.max(0, STATES.indexOf(act.state));
   const next = STATES[i + 1];
   const back = STATES[i - 1];
   return [
-    el("p", { class: "phase-now", text: t(`wall.state.${STATES[i]}`) }),
-    el("button", {
-      type: "button", class: "button", disabled: !next,
-      text: next ? t(next === "results" && !act.config?.live ? "wall.next.reveal" : `wall.next.${next}`) : t("wall.next.end"),
-      onclick: () => next && change({ state: next })
-    }),
-    el("button", {
-      type: "button", class: "button button-secondary", text: t("poll.back"), disabled: !back,
-      onclick: () => back && change({ state: back })
+    el("div", { class: "host-state" }, badge(t(`wall.state.${STATES[i]}`), STATE_BADGE[STATES[i]])),
+    actions({
+      primary: next
+        ? { text: t(next === "results" && !act.config?.live ? "wall.next.reveal" : `wall.next.${next}`), onclick: () => change({ state: next }) }
+        : { text: t("wall.next.endActivity"), onclick: () => end?.() },
+      secondary: [
+        { text: t("poll.back"), disabled: !back, onclick: () => back && change({ state: back }) },
+        ...extraSecondary
+      ]
     })
   ];
 }
@@ -143,9 +150,10 @@ export function changer(code, activityId) {
   };
 }
 
-// One card in the facilitator's list.
+// One card in the facilitator's list. extraClass: e.g. "host-card-pending"
+// (amber: waiting for approval) or "host-card-shown" (green: on the projector).
 export function hostCard(card, showVotes, ...buttons) {
-  return el("li", { class: card.hidden ? "host-card host-card-hidden" : "host-card" },
+  return el("li", { class: card.hidden ? "host-card host-card-hidden" : `host-card ${card.className || ""}`.trim() },
     el("p", { class: "host-card-text", text: card.text }),
     el("p", { class: "hint" }, [
       card.group ? t("text.group") : null,
@@ -155,7 +163,7 @@ export function hostCard(card, showVotes, ...buttons) {
     el("div", { class: "button-row" }, buttons));
 }
 
-function host({ el: root, code, activityId, activity }) {
+function host({ el: root, code, activityId, activity, end }) {
   let act = activity;
   let posts = {};
   let votes = {};
@@ -172,18 +180,20 @@ function host({ el: root, code, activityId, activity }) {
     fill(root,
       el("h2", { text: t("wall.name") }),
       el("p", { class: "poll-host-question", text: act.config?.prompt || "" }),
-      stateButtons(act, change),
-      el("p", { class: "count count-active", text: t("wall.cardCount", { count: visible }) }),
-      act.state !== "writing" && el("p", { class: "count", text: t("wall.voters", { count: voterCount(votes) }) }),
-      el("p", { class: "hint", text: t(act.config?.live ? "wall.liveNote" : "wall.revealNote") }),
-      el("h3", { text: t("wall.cardsTitle") }),
-      el("p", { class: "hint", text: t("wall.hideHint") }),
-      cards.length === 0 && el("p", { class: "hint", text: t("wall.noCards") }),
-      el("ul", { class: "host-cards" }, cards.map((card) => hostCard(card, act.state !== "writing",
-        el("button", {
-          type: "button", class: "button button-small button-secondary",
-          text: t(card.hidden ? "wall.show" : "wall.hide"), onclick: () => toggle(card)
-        })))));
+      withHelp(el("p", { class: "count count-active" }, [
+        t("wall.cardCount", { count: visible }),
+        act.state !== "writing" ? t("wall.voters", { count: voterCount(votes) }) : null
+      ].filter(Boolean).join(" · ")), t(act.config?.live ? "wall.liveNote" : "wall.revealNote")),
+      stateButtons(act, change, end),
+      fold("wall-cards", t("wall.cardsTitle"), [
+        el("p", { class: "hint", text: t("wall.hideHint") }),
+        cards.length === 0 && el("p", { class: "hint", text: t("wall.noCards") }),
+        el("ul", { class: "host-cards" }, cards.map((card) => hostCard(card, act.state !== "writing",
+          el("button", {
+            type: "button", class: "button button-small button-secondary",
+            text: t(card.hidden ? "wall.show" : "wall.hide"), onclick: () => toggle(card)
+          }))))
+      ], { className: "fold-inner", open: true, badge: badge(String(visible), "info") }));
   }
 
   const stopPosts = watchPosts(code, activityId, ROUND, (value) => { posts = value; draw(); }, (err) => console.error(err));
@@ -371,6 +381,8 @@ export function wallReport({ activity, posts, votes }) {
 
 export default {
   name: "wall.name",
+  short: "wall.short",
+  icon: "🧱",
   setup,
   describe,
   host,

@@ -24,17 +24,22 @@
 //   inbox/{id}/main/{pid}    proposals waiting for approval (facilitator only)
 //   posts/{id}/main/{pid}    approved proposals (public, NO author)
 //   signs/{id}/{pid}/{v}/{uid}   0 | 1 | 2   (js/ground-store.js)
+//   amends/{id}/{pid}/{v}/{aid}  { text, at }  a proposed change from someone who
+//                                voted "With a change" (NO author; only the facilitator
+//                                reads it and can put it to the vote as a new version)
 //
 // Nothing about the board is saved: it is always CALCULATED from the
 // signatures and the threshold (statementsOf below). So if the facilitator
 // changes the threshold, the board and the meter follow at once.
-import { t } from "../i18n.js";
+import { t, tEn } from "../i18n.js";
 import { el, fill } from "../dom.js";
+import { actions, badge, fold, withHelp } from "../host-ui.js";
 import { watchMemberCount } from "../session.js";
 import { watchPosts, watchInbox, watchMine, approveText, setHidden } from "../text-store.js";
-import { watchSigns, watchMySign, saveSign } from "../ground-store.js";
+import { watchSigns, watchMySign, saveSign, watchAmends, watchMyAmend, saveAmend, deleteAmend } from "../ground-store.js";
 import { PER_PERSON, clean, intBetween, hiddenOf, numberSelect, fitToBox, refitOnResize, textWriter } from "./text-base.js";
 import { ROUND, LIMITS, cardsOf, hostCard, drawCards, changer } from "./wall.js";
+import { watchPending } from "./moderated-wall.js";
 
 export const CHOICES = ["sign", "change", "cant"]; // the vote is the index: 0, 1, 2
 const THRESHOLDS = [50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100];
@@ -109,11 +114,12 @@ function meter(passed, total, big = false) {
 
 // ---------- Facilitator: setup ----------
 function setup({ el: root, onStart, onCancel }) {
-  const config = { prompt: t("ground.defaultPrompt"), perPerson: 1, threshold: DEFAULT_THRESHOLD };
+  // The prompt is shown on the projector: the default text is in English.
+  const config = { prompt: tEn("ground.defaultPrompt"), perPerson: 1, threshold: DEFAULT_THRESHOLD };
   const error = el("p", { class: "error", role: "alert", hidden: true });
   const fail = (text) => { error.textContent = text; error.hidden = !text; };
 
-  const startButton = el("button", { type: "button", class: "button", text: t("ground.start") });
+  const startButton = el("button", { type: "button", class: "button button-primary", text: t("ground.start") });
   startButton.addEventListener("click", async () => {
     const prompt = clean(config.prompt);
     if (!prompt || prompt.length > LIMITS.prompt) return fail(t("wall.errorPrompt", { max: LIMITS.prompt }));
@@ -129,28 +135,51 @@ function setup({ el: root, onStart, onCancel }) {
   });
 
   fill(root,
-    el("h2", { text: t("ground.name") }),
-    el("p", { class: "hint", text: t("ground.setupHint") }),
+    withHelp(el("h2", { text: t("ground.name") }), t("ground.setupHint")),
     el("label", { for: "ground-prompt", text: t("wall.promptLabel") }),
     el("textarea", {
       id: "ground-prompt", rows: 2, maxlength: LIMITS.prompt, value: config.prompt,
       oninput: (event) => { config.prompt = event.target.value; }
     }),
-    numberSelect("ground-per-person", t("ground.perPersonLabel"), PER_PERSON, config.perPerson, (n) => { config.perPerson = n; }),
-    el("p", { class: "hint", text: t("wall.textHint", { max: LIMITS.text }) }),
     thresholdSelect("ground-threshold", config.threshold, (n) => { config.threshold = n; }),
-    error,
-    startButton,
-    el("button", { type: "button", class: "button button-secondary", text: t("common.cancel"), onclick: onCancel }));
+    fold("ground-more", t("host.moreOptions"), [
+      numberSelect("ground-per-person", t("ground.perPersonLabel"), PER_PERSON, config.perPerson, (n) => { config.perPerson = n; }),
+      el("p", { class: "hint", text: t("wall.textHint", { max: LIMITS.text }) })
+    ], { className: "fold-inner" }),
+    el("div", { class: "setup-start" },
+      error,
+      startButton,
+      el("button", { type: "button", class: "button button-secondary", text: t("common.cancel"), onclick: onCancel })));
 }
 
 function thresholdSelect(id, selected, onchange) {
   return [
-    el("label", { for: id, text: t("ground.thresholdLabel") }),
+    withHelp(el("label", { for: id, text: t("ground.thresholdLabel") }), t("ground.thresholdHint")),
     el("select", { id, onchange: (event) => onchange(Number(event.target.value)) },
-      THRESHOLDS.map((n) => el("option", { value: String(n), text: `${n}%`, selected: n === selected }))),
-    el("p", { class: "hint", text: t("ground.thresholdHint") })
+      THRESHOLDS.map((n) => el("option", { value: String(n), text: `${n}%`, selected: n === selected })))
   ];
+}
+
+// All proposed changes for one statement, newest version first:
+//   [{ v, n, text, count }]  – the same text (ignoring case and spaces) is counted once.
+function amendsOf(amends, pid) {
+  const out = [];
+  Object.entries(amends?.[pid] || {})
+    .filter(([v]) => /^v[0-9]+$/.test(v))
+    .sort(([a], [b]) => versionNumber(b) - versionNumber(a))
+    .forEach(([v, items]) => {
+      const seen = new Map();
+      Object.values(items || {})
+        .filter((item) => item && typeof item.text === "string" && item.text)
+        .sort((a, b) => (a.at || 0) - (b.at || 0))
+        .forEach((item) => {
+          const key = clean(item.text).toLowerCase();
+          if (seen.has(key)) seen.get(key).count++;
+          else seen.set(key, { v, n: versionNumber(v), text: clean(item.text), count: 1 });
+        });
+      out.push(...seen.values());
+    });
+  return out;
 }
 
 function describe(activity) {
@@ -158,11 +187,14 @@ function describe(activity) {
 }
 
 // ---------- Facilitator: approve, put to the vote, new versions ----------
-function host({ el: root, code, activityId, activity }) {
+// The big button follows the work: put the next statement to the vote →
+// close voting → (new version, or) the next statement → show the board.
+function host({ el: root, code, activityId, activity, end }) {
   let act = activity;
   let inbox = {};
   let posts = {};
   let signs = {};
+  let amends = {};
   let members = 0;
   const change = changer(code, activityId);
   const failed = (err) => { console.error(err); alert(t("common.error")); };
@@ -175,6 +207,7 @@ function host({ el: root, code, activityId, activity }) {
   const listBox = el("div");
   root.replaceChildren(mainBox, reviseBox, listBox);
   let reviseKey = null;
+  let reviseInput = null;
 
   const approve = (pid) => approveText(code, activityId, ROUND, pid, inbox[pid]).catch(failed);
   // Hiding an approved text also removes the public copy: the projector can't read it any more.
@@ -195,38 +228,88 @@ function host({ el: root, code, activityId, activity }) {
   // A new version of the statement on the ballot, put to the vote at once.
   function releaseNewVersion(pid, text) {
     const versions = versionsOf(act, pid);
-    const next = versions.length ? versions[versions.length - 1].n + 1 : 0;
+    const latest = versions[versions.length - 1];
+    if (latest && clean(latest.text) === clean(text)) return alert(t("ground.errorSameText"));
+    const next = latest ? latest.n + 1 : 0;
     if (next >= MAX_VERSIONS) return alert(t("ground.errorTooManyVersions", { max: MAX_VERSIONS }));
     return change({ [`versions/${pid}/v${next}`]: text, ballot: { pid, v: `v${next}` }, state: "voting" });
   }
 
-  function stateLine() {
-    const state = ["writing", "voting", "results", "board"].includes(act.state) ? act.state : "writing";
-    return el("p", { class: "phase-now", text: t(`ground.state.${state}`) });
+  // The next statement nobody voted on yet (oldest first), or null.
+  const nextUnvoted = (statements) => statements.find((st) => !st.passed && !(st.latest?.total > 0) && !(st.latest?.open)) || null;
+
+  const STATE_BADGE = { writing: "live", voting: "live", results: "done", board: "live" };
+
+  function mainActions(statements) {
+    const upcoming = nextUnvoted(statements);
+    const releaseNext = upcoming && { text: t("ground.releaseNext"), onclick: () => release(upcoming) };
+    const showBoard = { text: t("ground.showBoard"), onclick: () => change({ state: "board" }) };
+    const backToWriting = { text: t("ground.backToWriting"), onclick: () => change({ state: "writing" }) };
+    switch (act.state) {
+      case "voting":
+        return { primary: { text: t("ground.closeVoting"), onclick: () => change({ state: "results" }) }, secondary: [] };
+      case "results":
+        return { primary: releaseNext || showBoard, secondary: [releaseNext && showBoard, backToWriting] };
+      case "board":
+        return {
+          primary: { text: t("ground.hideBoard"), onclick: () => change({ state: act.ballot ? "results" : "writing" }) },
+          secondary: [backToWriting, { text: t("ground.endActivity"), onclick: () => end?.() }]
+        };
+      default: // writing
+        return { primary: releaseNext || showBoard, secondary: [releaseNext && showBoard] };
+    }
+  }
+
+  // Proposed changes for the statement on the ballot (only the facilitator sees them).
+  function amendSection(ballot) {
+    const items = amendsOf(amends, ballot.pid);
+    const canUse = act.state === "results";
+    return el("div", { class: "ground-amends" },
+      withHelp(el("h3", {}, t("ground.amendsTitle"), " ", badge(String(items.reduce((n, a) => n + a.count, 0)), items.length ? "pending" : "done")),
+        t("ground.amendsHint")),
+      items.length === 0 && el("p", { class: "hint", text: t("ground.noAmends") }),
+      !canUse && items.length > 0 && el("p", { class: "hint", text: t("ground.amendsAfterVoting") }),
+      el("ul", { class: "amend-list" }, items.map((item) => el("li", { class: "amend" },
+        el("p", { class: "amend-text", text: item.text }),
+        el("p", { class: "hint" }, [
+          item.n !== ballot.n ? t("ground.versionN", { n: item.n + 1 }) : null,
+          item.count > 1 ? t("ground.amendCount", { count: item.count }) : null
+        ].filter(Boolean).join(" · ")),
+        canUse && el("div", { class: "button-row" },
+          el("button", {
+            type: "button", class: "button button-small", text: t("ground.useAmend"),
+            onclick: () => releaseNewVersion(ballot.pid, item.text)
+          }),
+          el("button", {
+            type: "button", class: "button button-small button-secondary", text: t("ground.editAmend"),
+            onclick: () => {
+              if (!reviseInput) return;
+              reviseInput.value = item.text;
+              reviseInput.focus();
+              reviseInput.scrollIntoView({ behavior: "smooth", block: "center" });
+            }
+          }))))));
   }
 
   function ballotSection(statements) {
     const ballot = ballotOf(act);
-    if (!ballot || act.state === "writing") return null;
-    const statement = statements.find((s) => s.pid === ballot.pid);
+    if (!ballot || act.state === "writing" || act.state === "board") return null;
+    const statement = statements.find((st) => st.pid === ballot.pid);
     const version = statement?.versions.find((ver) => ver.v === ballot.v);
     const counts = version?.counts || [0, 0, 0];
     const total = sum(counts);
     return el("div", { class: "ground-ballot" },
-      el("h3", { text: t("ground.ballotTitle") }),
-      ballot.n > 0 && el("p", { class: "label", text: t("ground.versionN", { n: ballot.n + 1 }) }),
+      el("p", { class: "label", text: ballot.n > 0 ? `${t("ground.ballotTitle")} · ${t("ground.versionN", { n: ballot.n + 1 })}` : t("ground.ballotTitle") }),
       el("p", { class: "poll-host-question", text: ballot.text }),
       el("p", { class: "count count-active", text: t("poll.voted", { count: total, total: members }) }),
       // The facilitator always sees the numbers on the phone (never projected before closing).
       el("ul", { class: "poll-mini" }, CHOICES.map((choice, k) => el("li", {},
         el("span", { text: t(`ground.choice.${choice}`) }),
         el("span", { text: `${counts[k]} · ${percent(counts[k], total)}%` })))),
-      act.state === "voting"
-        ? el("button", { type: "button", class: "button", text: t("ground.closeVoting"), onclick: () => change({ state: "results" }) })
-        : version && el("p", {
-          class: version.passed ? "ground-verdict ground-verdict-yes" : "ground-verdict",
-          text: t(version.passed ? "ground.passed" : "ground.notPassed", { pct: version.pct, threshold: thresholdOf(act) })
-        }));
+      act.state === "results" && version && el("p", {
+        class: version.passed ? "ground-verdict ground-verdict-yes" : "ground-verdict",
+        text: t(version.passed ? "ground.passed" : "ground.notPassed", { pct: version.pct, threshold: thresholdOf(act) })
+      }));
   }
 
   function drawRevise() {
@@ -234,11 +317,13 @@ function host({ el: root, code, activityId, activity }) {
     const key = act.state === "results" && ballot ? `${ballot.pid}/${ballot.v}` : null;
     if (key === reviseKey) return;
     reviseKey = key;
+    reviseInput = null;
     if (!key) return reviseBox.replaceChildren();
     const textarea = el("textarea", { id: "ground-revise", rows: 3, maxlength: LIMITS.text, value: ballot.text });
+    reviseInput = textarea;
     const error = el("p", { class: "error", role: "alert", hidden: true });
     const button = el("button", {
-      type: "button", class: "button", text: t("ground.releaseVersion"),
+      type: "button", class: "button button-secondary", text: t("ground.releaseVersion"),
       onclick: async () => {
         const text = clean(textarea.value);
         if (!text || text.length > LIMITS.text) {
@@ -258,8 +343,7 @@ function host({ el: root, code, activityId, activity }) {
       }
     });
     fill(reviseBox,
-      el("h3", { text: t("ground.reviseTitle") }),
-      el("p", { class: "hint", text: t("ground.reviseHint") }),
+      withHelp(el("h3", { text: t("ground.reviseTitle") }), t("ground.reviseHint")),
       el("label", { for: "ground-revise", text: t("ground.reviseLabel") }),
       textarea, error, button);
   }
@@ -267,13 +351,13 @@ function host({ el: root, code, activityId, activity }) {
   function statementItem(statement) {
     const onBallot = act.ballot?.pid === statement.pid;
     const status = statement.passed
-      ? t("ground.statusPassed", { pct: statement.passed.pct })
-      : statement.latest?.open ? t("ground.statusVoting")
-        : statement.latest?.total ? t("ground.statusNotPassed", { pct: statement.latest.pct })
-          : t("ground.statusNew");
+      ? badge(t("ground.statusPassed", { pct: statement.passed.pct }), "live")
+      : statement.latest?.open ? badge(t("ground.statusVoting"), "preview")
+        : statement.latest?.total ? badge(t("ground.statusNotPassed", { pct: statement.latest.pct }), "done")
+          : badge(t("ground.statusNew"), "info");
     return el("li", { class: statement.passed ? "host-card ground-card-passed" : "host-card" },
       el("p", { class: "host-card-text", text: statement.latest?.text || statement.text }),
-      el("p", { class: "hint", text: status }),
+      el("p", { class: "activity-item-badges" }, status),
       // The history: every version with its result, oldest first.
       statement.versions.length > 1 && el("ol", { class: "ground-history" }, statement.versions.map((ver) => el("li", {},
         el("span", { text: ver.text }),
@@ -291,45 +375,48 @@ function host({ el: root, code, activityId, activity }) {
   function draw() {
     const hidden = hiddenOf(act, ROUND);
     const statements = statementsOf(act, posts, signs);
-    const passed = statements.filter((s) => s.passed).length;
+    const passed = statements.filter((st) => st.passed).length;
     const all = cardsOf(inbox, {}, {}, false);
     const pending = all.filter((c) => !posts[c.pid] && !hidden[c.pid]);
     const hiddenCards = all.filter((c) => !posts[c.pid] && hidden[c.pid]);
+    const state = STATE_BADGE[act.state] ? act.state : "writing";
+    const ballot = ballotOf(act);
 
     fill(mainBox,
       el("h2", { text: t("ground.name") }),
       el("p", { class: "poll-host-question", text: act.config?.prompt || "" }),
-      stateLine(),
-      el("p", { class: "count count-active", text: t("ground.meter", { passed, count: statements.length }) }),
+      el("div", { class: "host-state" },
+        badge(t(`ground.state.${state}`), STATE_BADGE[state]),
+        el("span", { class: "phase-now", text: t("ground.meter", { passed, count: statements.length }) })),
       ballotSection(statements),
-      el("div", { class: "button-row" },
-        act.state === "board"
-          ? el("button", { type: "button", class: "button", text: t("ground.hideBoard"), onclick: () => change({ state: act.ballot ? "results" : "writing" }) })
-          : el("button", { type: "button", class: "button", text: t("ground.showBoard"), disabled: act.state === "voting", onclick: () => change({ state: "board" }) }),
-        act.state !== "writing" && el("button", {
-          type: "button", class: "button button-secondary", text: t("ground.backToWriting"),
-          disabled: act.state === "voting", onclick: () => change({ state: "writing" })
-        })),
-      thresholdSelect("ground-threshold-now", thresholdOf(act), (n) => change({ "config/threshold": n })));
+      actions(mainActions(statements)),
+      ballot && (act.state === "voting" || act.state === "results") && amendSection(ballot));
 
     drawRevise();
 
     fill(listBox,
-      el("h3", { text: t("ground.pendingTitle") }),
-      el("p", { class: "hint", text: t("modwall.pendingHint") }),
-      pending.length === 0 && el("p", { class: "hint", text: t("modwall.noPending") }),
-      el("ul", { class: "host-cards" }, pending.map((card) => hostCard(card, false,
-        el("button", { type: "button", class: "button button-small", text: t("modwall.approve"), onclick: () => approve(card.pid) }),
-        el("button", { type: "button", class: "button button-small button-secondary", text: t("wall.hide"), onclick: () => hide(card.pid) })))),
+      // Waiting for approval: amber, always open.
+      el("div", { class: "pending-box" },
+        withHelp(el("h3", {}, t("ground.pendingTitle"), " ", badge(String(pending.length), pending.length ? "pending" : "done")), t("modwall.pendingHint")),
+        pending.length === 0 && el("p", { class: "hint", text: t("modwall.noPending") }),
+        el("ul", { class: "host-cards" }, pending.map((card) => hostCard({ ...card, className: "host-card-pending" }, false,
+          el("button", { type: "button", class: "button button-small", text: t("modwall.approve"), onclick: () => approve(card.pid) }),
+          el("button", { type: "button", class: "button button-small button-secondary", text: t("wall.hide"), onclick: () => hide(card.pid) }))))),
 
-      el("h3", { text: t("ground.statementsTitle") }),
-      el("p", { class: "hint", text: t("ground.statementsHint") }),
-      statements.length === 0 && el("p", { class: "hint", text: t("wall.noCards") }),
-      el("ul", { class: "host-cards" }, statements.map(statementItem)),
+      fold("ground-statements", t("ground.statementsTitle"), [
+        el("p", { class: "hint", text: t("ground.statementsHint") }),
+        statements.length === 0 && el("p", { class: "hint", text: t("wall.noCards") }),
+        el("ul", { class: "host-cards" }, statements.map(statementItem))
+      ], { className: "fold-inner", open: true, badge: badge(String(statements.length), "info") }),
 
-      hiddenCards.length > 0 && el("h3", { text: t("modwall.hiddenTitle") }),
-      el("ul", { class: "host-cards" }, hiddenCards.map((card) => hostCard({ ...card, hidden: true }, false,
-        el("button", { type: "button", class: "button button-small button-secondary", text: t("modwall.approve"), onclick: () => approve(card.pid) })))));
+      fold("ground-threshold", t("ground.thresholdFold", { threshold: thresholdOf(act) }),
+        thresholdSelect("ground-threshold-now", thresholdOf(act), (n) => change({ "config/threshold": n })),
+        { className: "fold-inner" }),
+
+      hiddenCards.length > 0 && fold("ground-hidden", t("modwall.hiddenTitle"), [
+        el("ul", { class: "host-cards" }, hiddenCards.map((card) => hostCard({ ...card, hidden: true }, false,
+          el("button", { type: "button", class: "button button-small button-secondary", text: t("modwall.approve"), onclick: () => approve(card.pid) }))))
+      ], { className: "fold-inner", badge: badge(String(hiddenCards.length), "done") }));
   }
 
   const onError = (err) => console.error(err);
@@ -337,6 +424,7 @@ function host({ el: root, code, activityId, activity }) {
     watchInbox(code, activityId, ROUND, (value) => { inbox = value; draw(); }, onError),
     watchPosts(code, activityId, ROUND, (value) => { posts = value; draw(); }, onError),
     watchSigns(code, activityId, (value) => { signs = value; draw(); }, onError),
+    watchAmends(code, activityId, (value) => { amends = value; draw(); }, onError),
     watchMemberCount(code, (n) => { members = n; draw(); }, onError)
   ];
   draw();
@@ -348,6 +436,104 @@ function host({ el: root, code, activityId, activity }) {
 }
 
 // ---------- Participant ----------
+
+// "With a change": a box to write the change (max 200 characters, anonymous).
+// It has its own place on the page and is NOT drawn again with every vote,
+// so the keyboard stays open while typing. follow(ballot) switches it to the
+// version on the vote; show(true/false) when my vote is (not) "With a change".
+function amendWriter({ code, uid, activityId }) {
+  let key = null;
+  let ballot = null;
+  let mine = null; // { aid, text } – my proposal for this version
+  let stop = null;
+  let busy = false;
+
+  const input = el("textarea", {
+    id: "ground-amend", rows: 3, maxlength: LIMITS.text, dir: "auto",
+    oninput: () => { counter.textContent = t("text.chars", { count: input.value.length, max: LIMITS.text }); }
+  });
+  const counter = el("p", { class: "hint text-counter" });
+  const status = el("p", { class: "my-text-status", role: "status" });
+  const error = el("p", { class: "error", role: "alert", hidden: true });
+  const send = el("button", { type: "submit", class: "button" });
+  const remove = el("button", {
+    type: "button", class: "button button-small button-secondary", text: t("text.delete"),
+    onclick: async () => {
+      if (!mine || !confirm(t("ground.amendConfirmDelete"))) return;
+      try {
+        await deleteAmend(code, activityId, ballot.pid, ballot.v, uid, mine.aid);
+        input.value = "";
+      } catch (err) {
+        console.error(err);
+        fail(t("text.saveError"));
+      }
+    }
+  });
+  const form = el("form", { class: "amend-box", novalidate: true, hidden: true, onsubmit: (event) => { event.preventDefault(); submit(); } },
+    el("label", { for: "ground-amend", text: t("ground.amendLabel") }),
+    el("p", { class: "hint", text: t("ground.amendHint") }),
+    input, counter, status, error, send, remove);
+
+  function fail(text) {
+    error.textContent = text;
+    error.hidden = !text;
+  }
+
+  function draw() {
+    send.textContent = t(busy ? "text.sending" : mine ? "text.save" : "ground.amendSend");
+    send.disabled = busy;
+    remove.hidden = !mine;
+    status.hidden = !mine;
+    status.textContent = mine ? t("ground.amendSaved") : "";
+    counter.textContent = t("text.chars", { count: input.value.length, max: LIMITS.text });
+  }
+
+  async function submit() {
+    const text = clean(input.value);
+    if (!text || text.length > LIMITS.text) return fail(t("text.errorLength", { max: LIMITS.text }));
+    fail("");
+    busy = true;
+    draw();
+    try {
+      await saveAmend(code, activityId, ballot.pid, ballot.v, uid, mine?.aid || null, text);
+      input.value = text;
+    } catch (err) {
+      console.error(err);
+      fail(t("text.saveError"));
+    } finally {
+      busy = false;
+      draw();
+    }
+  }
+
+  return {
+    el: form,
+    get mine() { return mine; },
+    follow(next) {
+      const nextKey = next ? `${next.pid}/${next.v}` : null;
+      if (nextKey === key) return;
+      if (stop) stop();
+      stop = null;
+      key = nextKey;
+      ballot = next;
+      mine = null;
+      input.value = "";
+      fail("");
+      draw();
+      if (next) {
+        stop = watchMyAmend(code, activityId, next.pid, next.v, uid, (value) => {
+          mine = value;
+          // Show what I sent, unless I am in the middle of changing it.
+          if (mine && document.activeElement !== input) input.value = mine.text;
+          draw();
+        }, (err) => console.error(err));
+      }
+    },
+    show(visible) { form.hidden = !visible; },
+    destroy() { if (stop) stop(); }
+  };
+}
+
 function participant({ el: root, code, uid, activityId, activity }) {
   let act = activity;
   let posts = {};
@@ -361,16 +547,22 @@ function participant({ el: root, code, uid, activityId, activity }) {
     perPerson: perPersonOf(act), normalize: clean, multiline: true,
     statusOf: (pid) => (posts[pid] ? t("modwall.statusShown") : hiddenOf(act, ROUND)[pid] ? t("modwall.statusHidden") : t("modwall.statusPending"))
   });
+  const amend = amendWriter({ code, uid, activityId });
   const prompt = el("h1", { class: "poll-question-phone" });
   const writeHint = el("p", { class: "hint", text: t("ground.writeHint") });
   const writeCard = el("section", { class: "card" }, prompt, writeHint, writer.el);
-  const signCard = el("section", { class: "card" });
+  // The voting card: the top part is drawn again with every change, the box
+  // for a proposed change keeps its place (and what is being typed in it).
+  const signTop = el("div");
+  const signBottom = el("div");
+  const signCard = el("section", { class: "card" }, signTop, amend.el, signBottom);
   root.replaceChildren(writeCard, signCard);
 
   // Listen only to MY signature for the version on the ballot.
   function followSign() {
     const ballot = ballotOf(act);
     const key = ballot ? `${ballot.pid}/${ballot.v}` : null;
+    amend.follow(ballot);
     if (key === signKey) return;
     if (stopSign) stopSign();
     stopSign = null;
@@ -386,7 +578,9 @@ function participant({ el: root, code, uid, activityId, activity }) {
     error = "";
     draw();
     try {
-      await saveSign(code, activityId, ballot.pid, ballot.v, uid, choice);
+      // Away from "With a change": my proposed change is deleted in the same step.
+      const removeAmend = choice !== 1 ? amend.mine?.aid || null : null;
+      await saveSign(code, activityId, ballot.pid, ballot.v, uid, choice, removeAmend);
     } catch (err) {
       console.error(err);
       mySign = before;
@@ -402,11 +596,13 @@ function participant({ el: root, code, uid, activityId, activity }) {
     writer.update(writing);
     writeCard.hidden = !writing;
     signCard.hidden = writing;
+    const ballot = ballotOf(act);
+    // Set once per drawing (hiding it for a moment would close the keyboard).
+    amend.show(act.state === "voting" && !!ballot && mySign === 1);
     if (writing) return;
 
-    const ballot = ballotOf(act);
     if (act.state === "voting" && ballot) {
-      fill(signCard,
+      fill(signTop,
         el("p", { class: "label", text: t("ground.canYouSign") }),
         el("h1", { class: "poll-question-phone", text: ballot.text }),
         ballot.n > 0 && el("p", { class: "hint", text: t("ground.newVersionNote") }),
@@ -414,17 +610,19 @@ function participant({ el: root, code, uid, activityId, activity }) {
           type: "button", class: mySign === k ? "poll-option poll-option-chosen" : "poll-option",
           "aria-pressed": mySign === k ? "true" : "false", text: t(`ground.choice.${choice}`),
           onclick: () => sign(ballot, k)
-        }))),
+        }))));
+      fill(signBottom,
         error && el("p", { class: "error", role: "alert", text: error }),
         el("p", { class: "hint", text: t(mySign == null ? "poll.tapToVote" : "poll.voteSaved") }));
       return;
     }
 
     // results or board: voting is closed
-    fill(signCard, el("div", { class: "center" },
+    fill(signTop, el("div", { class: "center" },
       act.state === "results" && ballot && el("p", { class: "poll-question-phone", text: ballot.text }),
       el("p", { text: t(act.state === "board" ? "ground.lookAtBoard" : "poll.closed") }),
       act.state === "results" && mySign != null && el("p", { class: "hint", text: t("poll.yourVote", { option: t(`ground.choice.${CHOICES[mySign]}`) }) })));
+    fill(signBottom);
   }
 
   const stopPosts = watchPosts(code, activityId, ROUND, (value) => { posts = value; writer.refresh(); }, (err) => console.error(err));
@@ -433,7 +631,7 @@ function participant({ el: root, code, uid, activityId, activity }) {
 
   return {
     update(next) { act = next; followSign(); draw(); },
-    destroy() { writer.destroy(); stopPosts(); if (stopSign) stopSign(); }
+    destroy() { writer.destroy(); amend.destroy(); stopPosts(); if (stopSign) stopSign(); }
   };
 }
 
@@ -549,7 +747,10 @@ function report({ activity, posts, signs }) {
 
 export default {
   name: "ground.name",
+  short: "ground.short",
+  icon: "🤝",
   setup,
+  watchPending,
   describe,
   host,
   participant,

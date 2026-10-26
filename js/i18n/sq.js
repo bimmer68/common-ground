@@ -105,5 +105,10 @@ export default {
   "ground.lookAtBoard": "Shiko ekranin: kjo është ajo që i gjithë grupi mund ta nënshkruajë.",
   "ground.choice.sign": "Mund ta nënshkruaj",
   "ground.choice.change": "Me një ndryshim",
-  "ground.choice.cant": "Nuk mund ta nënshkruaj"
+  "ground.choice.cant": "Nuk mund ta nënshkruaj",
+  "ground.amendLabel": "Ndryshimi yt (opsional)",
+  "ground.amendHint": "Shkruaj si duhet ndryshuar deklarata që ta nënshkruash. E sheh vetëm lehtësuesi, pa emrin tënd.",
+  "ground.amendSend": "Dërgo ndryshimin",
+  "ground.amendSaved": "U dërgua te lehtësuesi. Mund ta ndryshosh derisa votimi është i hapur.",
+  "ground.amendConfirmDelete": "Të fshihet ndryshimi që propozove?"
 };

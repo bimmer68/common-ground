@@ -7,15 +7,33 @@
   <link rel="stylesheet" href="css/app.css">
 </head>
 <body class="page-host">
+  <!-- Always visible at the top while the session is open (position: sticky):
+       code, number of participants, what is on the projector, timer. -->
+  <header class="host-bar" id="host-bar" hidden>
+    <div class="host-bar-row">
+      <span class="bar-code" id="bar-code" data-i18n-aria="host.sessionCode"></span>
+      <span class="bar-people" id="bar-people"></span>
+      <span class="bar-activity" id="bar-activity"></span>
+      <button type="button" class="bar-timer" id="bar-timer" aria-expanded="false" aria-controls="timer"></button>
+    </div>
+    <!-- Timer for the projector, drawn by js/timer.js; opens under the bar. -->
+    <div class="timer-panel" id="timer" hidden></div>
+  </header>
+
   <main class="container">
     <p class="status" id="loading" data-i18n="common.loading"></p>
 
     <div id="create" hidden>
+      <div class="language-row">
+        <label for="host-language-start" data-i18n="host.language"></label>
+        <select id="host-language-start" class="host-language"></select>
+      </div>
+
       <section class="card">
         <h1 data-i18n="host.title"></h1>
         <p class="notice" id="create-notice" hidden></p>
         <p data-i18n="host.intro"></p>
-        <button type="button" id="create-button" class="button" data-i18n="host.create"></button>
+        <button type="button" id="create-button" class="button button-primary" data-i18n="host.create"></button>
         <p class="error" id="create-error" role="alert" hidden></p>
       </section>
 
@@ -37,57 +55,82 @@
     </div>
 
     <section id="dashboard" hidden>
-      <div class="card center">
-        <p class="label" data-i18n="host.sessionCode"></p>
-        <p class="big-code" id="code"></p>
-        <a class="button" id="screen-link" target="_blank" rel="noopener" data-i18n="host.openScreen"></a>
-        <p class="label" data-i18n="host.participantLink"></p>
-        <p class="link-text" id="participant-link"></p>
-      </div>
+      <!-- "Now": the activity on the projector (or one opened only on this
+           phone). Its module draws the controls into #activity. -->
+      <section class="now-card" id="now" aria-labelledby="now-title">
+        <div class="now-head">
+          <span class="type-icon" id="now-icon" aria-hidden="true"></span>
+          <div class="now-heading">
+            <p class="now-kicker" id="now-kicker"></p>
+            <h1 class="now-title" id="now-title"></h1>
+          </div>
+          <span id="now-badge"></span>
+        </div>
 
-      <div class="card">
-        <h2 data-i18n="host.currentActivity"></h2>
+        <div class="preview-bar" id="preview-bar" hidden>
+          <p class="preview-text" id="preview-text"></p>
+          <div class="preview-buttons">
+            <button type="button" class="button button-small button-project" id="preview-project" data-i18n="host.toProjector"></button>
+            <button type="button" class="button button-small button-secondary" id="preview-close" data-i18n="host.previewClose"></button>
+          </div>
+        </div>
+
         <p class="hint" id="no-activity" data-i18n="host.noActivity"></p>
         <div id="activity"></div>
-        <button type="button" id="end-activity" class="button button-secondary" data-i18n="host.endActivity" hidden></button>
-      </div>
+        <button type="button" id="end-activity" class="button button-small button-danger end-button" data-i18n="host.endActivity" hidden></button>
+      </section>
 
-      <!-- Timer for the projector, drawn by js/timer.js -->
-      <div class="card" id="timer"></div>
-
-      <div class="card">
+      <section class="card" id="new-activity-card">
         <div id="new-activity">
           <h2 data-i18n="host.newActivity"></h2>
-          <div id="activity-types"></div>
+          <div class="tiles" id="activity-types"></div>
         </div>
         <div id="activity-setup" hidden></div>
-      </div>
+      </section>
 
-      <div class="card">
-        <h2 data-i18n="host.earlierActivities"></h2>
-        <p class="hint" id="no-activities" data-i18n="host.noActivities"></p>
-        <ul class="activity-list" id="activities"></ul>
-      </div>
+      <!-- Everything else is folded, so it never pushes the controls down. -->
+      <details class="fold" id="fold-activities">
+        <summary><span class="fold-title" data-i18n="host.earlierActivities"></span><span id="activities-badge"></span></summary>
+        <div class="fold-body">
+          <p class="hint" id="no-activities" data-i18n="host.noActivities"></p>
+          <ul class="activity-list" id="activities"></ul>
+        </div>
+      </details>
 
-      <div class="card center">
-        <p class="label" data-i18n="host.participants"></p>
-        <p class="big-count" id="participant-count">0</p>
-        <p class="hint" data-i18n="host.participantsHint"></p>
-      </div>
+      <details class="fold">
+        <summary><span class="fold-title" data-i18n="host.projectorFold"></span></summary>
+        <div class="fold-body">
+          <a class="button button-small" id="screen-link" target="_blank" rel="noopener" data-i18n="host.openScreen"></a>
+          <p class="label" data-i18n="host.participantLink"></p>
+          <p class="link-text" id="participant-link"></p>
+        </div>
+      </details>
 
-      <div class="card">
-        <h2 data-i18n="host.reportTitle"></h2>
-        <a class="button button-secondary" id="report-link" target="_blank" rel="noopener" data-i18n="host.openReport"></a>
-        <p class="hint" data-i18n="host.reportHint"></p>
-      </div>
+      <details class="fold">
+        <summary><span class="fold-title" data-i18n="host.reportTitle"></span></summary>
+        <div class="fold-body">
+          <a class="button button-small" id="report-link" target="_blank" rel="noopener" data-i18n="host.openReport"></a>
+          <p class="hint" data-i18n="host.reportHint"></p>
+        </div>
+      </details>
 
-      <div class="card">
-        <p class="label" data-i18n="host.pin"></p>
-        <p class="pin" id="pin"></p>
-        <p class="hint" data-i18n="host.pinHint"></p>
-      </div>
+      <details class="fold">
+        <summary><span class="fold-title" data-i18n="host.pin"></span></summary>
+        <div class="fold-body">
+          <p class="pin" id="pin"></p>
+          <p class="hint" data-i18n="host.pinHint"></p>
+        </div>
+      </details>
 
-      <button type="button" id="new-session" class="button button-secondary" data-i18n="host.newSession"></button>
+      <details class="fold">
+        <summary><span class="fold-title" data-i18n="host.settings"></span></summary>
+        <div class="fold-body">
+          <label for="host-language" data-i18n="host.language"></label>
+          <select id="host-language" class="host-language"></select>
+          <p class="hint" data-i18n="host.languageHint"></p>
+          <button type="button" id="new-session" class="button button-small button-danger" data-i18n="host.newSession"></button>
+        </div>
+      </details>
     </section>
 
     <p class="error" id="fatal-error" role="alert" hidden></p>

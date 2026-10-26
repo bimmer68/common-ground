@@ -20,6 +20,7 @@
 // The facilitator can remove a word from the projector (hidden).
 import { t } from "../i18n.js";
 import { el, fill } from "../dom.js";
+import { actions, badge, fold, withHelp } from "../host-ui.js";
 import { updateActivity } from "../activity-store.js";
 import { watchPosts, setHidden } from "../text-store.js";
 import {
@@ -107,7 +108,7 @@ function setup({ el: root, onStart, onCancel }) {
         })));
   }
 
-  const startButton = el("button", { type: "button", class: "button", text: t("cloud.start") });
+  const startButton = el("button", { type: "button", class: "button button-primary", text: t("cloud.start") });
   startButton.addEventListener("click", async () => {
     const cleaned = prompts.map(clean);
     if (cleaned.some((p) => !p || p.length > LIMITS.prompt)) return fail(t("cloud.errorPrompt", { max: LIMITS.prompt }));
@@ -125,8 +126,7 @@ function setup({ el: root, onStart, onCancel }) {
 
   function draw() {
     fill(root,
-      el("h2", { text: t("cloud.name") }),
-      el("p", { class: "hint", text: t("cloud.setupHint") }),
+      withHelp(el("h2", { text: t("cloud.name") }), t("cloud.setupHint")),
       el("label", { for: "cloud-title", text: t("poll.titleLabel") }),
       el("input", {
         id: "cloud-title", maxlength: LIMITS.title, value: title, placeholder: t("cloud.titlePlaceholder"),
@@ -137,12 +137,15 @@ function setup({ el: root, onStart, onCancel }) {
         type: "button", class: "button button-small button-secondary add-button", text: t("cloud.addPrompt"),
         onclick: () => { prompts.push(""); draw(); }
       }),
-      numberSelect("cloud-per-person", t("text.perPersonLabel"), PER_PERSON, perPerson, (n) => { perPerson = n; }),
-      el("p", { class: "hint", text: t("cloud.answerHint", { max: LIMITS.answer }) }),
-      checkbox(t("cloud.liveLabel"), live, (v) => { live = v; }),
-      error,
-      startButton,
-      el("button", { type: "button", class: "button button-secondary", text: t("common.cancel"), onclick: onCancel }));
+      fold("cloud-more", t("host.moreOptions"), [
+        numberSelect("cloud-per-person", t("text.perPersonLabel"), PER_PERSON, perPerson, (n) => { perPerson = n; }),
+        el("p", { class: "hint", text: t("cloud.answerHint", { max: LIMITS.answer }) }),
+        checkbox(t("cloud.liveLabel"), live, (v) => { live = v; })
+      ], { className: "fold-inner" }),
+      el("div", { class: "setup-start" },
+        error,
+        startButton,
+        el("button", { type: "button", class: "button button-secondary", text: t("common.cancel"), onclick: onCancel })));
   }
 
   draw();
@@ -155,11 +158,12 @@ function describe(activity) {
 }
 
 // ---------- Facilitator: Next / Back, remove words ----------
-function host({ el: root, code, activityId, activity }) {
+function host({ el: root, code, activityId, activity, end }) {
   let act = activity;
   let posts = {};
   let stopPosts = null;
   let round = null;
+  let jumpOpen = false;
 
   async function change(fields) {
     try {
@@ -190,30 +194,41 @@ function host({ el: root, code, activityId, activity }) {
     const next = nextStep(act, prompts.length);
     const back = previousStep(act);
 
+    const writing = act.state === "writing";
     fill(root,
       el("h2", { text: act.config?.title || t("cloud.name") }),
-      el("p", { class: "label", text: t("cloud.promptOf", { n: i + 1, total: prompts.length }) }),
+      act.config?.title && el("p", { class: "label", text: act.config.title }),
+      el("div", { class: "host-state" },
+        el("span", { class: "phase-now", text: t("cloud.promptOf", { n: i + 1, total: prompts.length }) }),
+        badge(t(`cloud.state.${writing ? "writing" : "results"}`), writing ? "live" : "done")),
       el("p", { class: "poll-host-question", text: prompts[i] || "" }),
-      el("p", { class: "phase-now", text: t(`cloud.state.${act.state}`) }),
-      el("p", { class: "count count-active", text: t("cloud.answers", { count: Object.keys(posts).length }) }),
-      el("p", { class: "hint", text: t(act.config?.live ? "cloud.liveNote" : "cloud.revealNote") }),
-      el("button", { type: "button", class: "button", text: nextLabel(act, prompts.length), disabled: !next, onclick: () => next && change(next) }),
-      el("button", { type: "button", class: "button button-secondary", text: t("poll.back"), disabled: !back, onclick: () => back && change(back) }),
-      el("label", { for: "cloud-jump", text: t("cloud.jump") }),
-      el("select", {
-        id: "cloud-jump",
-        onchange: (event) => change({ phase: `q${event.target.value}`, state: "writing" })
-      }, prompts.map((p, k) => el("option", { value: String(k), text: `${k + 1}. ${p}`, selected: k === i }))),
-      el("h3", { text: t("cloud.wordsTitle") }),
-      el("p", { class: "hint", text: t("cloud.wordsHint") }),
-      words.length === 0 && el("p", { class: "hint", text: t("cloud.noWords") }),
-      el("ul", { class: "word-list" }, words.map((w) => el("li", { class: w.hidden ? "word-hidden" : null },
-        el("span", { text: `${w.word} · ${w.count}` }),
+      withHelp(el("p", { class: "count count-active", text: t("cloud.answers", { count: Object.keys(posts).length }) }),
+        t(act.config?.live ? "cloud.liveNote" : "cloud.revealNote")),
+      actions({
+        primary: next
+          ? { text: nextLabel(act, prompts.length), onclick: () => change(next) }
+          : { text: t("cloud.next.endActivity"), onclick: () => end?.() },
+        secondary: [
+          { text: t("poll.back"), disabled: !back, onclick: () => back && change(back) },
+          prompts.length > 1 && { text: `${t("cloud.jump")} ${jumpOpen ? "▴" : "▾"}`, pressed: jumpOpen, onclick: () => { jumpOpen = !jumpOpen; draw(); } }
+        ]
+      }),
+      jumpOpen && el("ul", { class: "jump-list" }, prompts.map((p, k) => el("li", {},
         el("button", {
-          type: "button", class: "button button-small button-secondary",
-          text: t(w.hidden ? "cloud.restoreWord" : "cloud.removeWord"),
-          onclick: () => toggleWord(w.key, !w.hidden)
-        })))));
+          type: "button", "aria-current": k === i ? "true" : null, text: `${k + 1}. ${p}`,
+          onclick: () => { jumpOpen = false; change({ phase: `q${k}`, state: "writing" }); }
+        })))),
+      fold("cloud-words", t("cloud.wordsTitle"), [
+        el("p", { class: "hint", text: t("cloud.wordsHint") }),
+        words.length === 0 && el("p", { class: "hint", text: t("cloud.noWords") }),
+        el("ul", { class: "word-list" }, words.map((w) => el("li", { class: w.hidden ? "word-hidden" : null },
+          el("span", { text: `${w.word} · ${w.count}` }),
+          el("button", {
+            type: "button", class: "button button-small button-secondary",
+            text: t(w.hidden ? "cloud.restoreWord" : "cloud.removeWord"),
+            onclick: () => toggleWord(w.key, !w.hidden)
+          }))))
+      ], { className: "fold-inner", open: true, badge: words.length ? badge(String(words.length), "info") : null }));
   }
 
   follow();
@@ -350,6 +365,8 @@ function report({ activity, posts }) {
 
 export default {
   name: "cloud.name",
+  short: "cloud.short",
+  icon: "☁️",
   setup,
   describe,
   host,

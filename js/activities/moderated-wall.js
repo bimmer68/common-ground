@@ -24,11 +24,13 @@
 //                 Reveal the facilitator writes activities/{id}/answer, and the
 //                 rules accept only the label the author really chose. The
 //                 author is never shown.
-import { t } from "../i18n.js";
+import { t, tEn } from "../i18n.js";
 import { el, fill } from "../dom.js";
+import { actions, badge, fold, withHelp } from "../host-ui.js";
 import {
   watchPosts, watchInbox, watchMine, watchVotes, watchGuesses, saveGuess, approveText, setHidden, tallyVotes
 } from "../text-store.js";
+import { watchActivity } from "../activity-store.js";
 import { list, clean, hiddenOf, checkbox, fitToBox, refitOnResize } from "./text-base.js";
 import {
   ROUND, LIMITS, wallSetup, stateButtons, changer, hostCard, cardsOf, voterCount, wallParticipant, wallScreen, wallReport
@@ -51,7 +53,8 @@ function countGuesses(guesses) {
 // ---------- Facilitator: setup ----------
 function setup(ctx) {
   let useLabels = false;
-  const labelInputs = [t("modwall.defaultLabel0"), t("modwall.defaultLabel1")].map((value, i) => el("input", {
+  // The labels are shown on the projector and the phones: default texts in English.
+  const labelInputs = [tEn("modwall.defaultLabel0"), tEn("modwall.defaultLabel1")].map((value, i) => el("input", {
     id: `modwall-label${i}`, maxlength: LIMITS.label, value, "aria-label": t("modwall.labelN", { n: i + 1 })
   }));
   const labelFields = el("div", { class: "label-fields", hidden: true },
@@ -81,8 +84,24 @@ function describe(activity) {
   return `${t("modwall.name")} · ${activity.config?.prompt || ""}`;
 }
 
+// ---------- Texts waiting for approval (for the facilitator's list of activities) ----------
+// Calls callback(number) with how many texts wait for approval: in the inbox,
+// not approved (no public copy) and not hidden. Shared with Common Ground.
+export function watchPending({ code, activityId }, callback, onError) {
+  let inbox = {};
+  let posts = {};
+  let hidden = {};
+  const report = () => callback(Object.keys(inbox).filter((pid) => !posts[pid] && !hidden[pid]).length);
+  const stops = [
+    watchInbox(code, activityId, ROUND, (value) => { inbox = value; report(); }, onError),
+    watchPosts(code, activityId, ROUND, (value) => { posts = value; report(); }, onError),
+    watchActivity(code, activityId, (act) => { hidden = hiddenOf(act || {}, ROUND); report(); }, onError)
+  ];
+  return () => stops.forEach((stop) => stop());
+}
+
 // ---------- Facilitator: approve, hide, spotlight ----------
-function host({ el: root, code, activityId, activity }) {
+function host({ el: root, code, activityId, activity, end }) {
   let act = activity;
   let inbox = {};
   let posts = {};
@@ -121,33 +140,39 @@ function host({ el: root, code, activityId, activity }) {
     const cards = approvedCards();
     const labels = labelsOf(act);
     if (!act.spotlight) {
-      return el("div", { class: "spotlight-controls" },
-        el("h3", { text: t("modwall.spotlightTitle") }),
+      return fold("modwall-spotlight", t("modwall.spotlightTitle"), [
         el("p", { class: "hint", text: t(labels ? "modwall.spotlightHintLabels" : "modwall.spotlightHint") }),
         el("button", {
-          type: "button", class: "button", text: t("modwall.spotlightStart"), disabled: !cards.length,
+          type: "button", class: "button button-secondary", text: t("modwall.spotlightStart"), disabled: !cards.length,
           onclick: () => cards.length && change({ spotlight: cards[0].pid, answer: null })
-        }));
+        })
+      ], { className: "fold-inner" });
     }
     const i = cards.findIndex((c) => c.pid === act.spotlight);
     const go = (k) => change({ spotlight: cards[k].pid, answer: null });
     const counts = countGuesses(guesses);
     const total = counts[0] + counts[1];
+    const answered = act.answer === 0 || act.answer === 1;
+    // While the spotlight is on, it is the main thing: it gets the big button.
     return el("div", { class: "spotlight-controls" },
-      el("h3", { text: t("modwall.spotlightTitle") }),
-      el("p", { class: "label", text: i >= 0 ? t("modwall.spotlightOf", { n: i + 1, total: cards.length }) : "" }),
+      el("div", { class: "host-state" },
+        badge(t("modwall.spotlightOn"), "live"),
+        i >= 0 && el("span", { class: "phase-now", text: t("modwall.spotlightOf", { n: i + 1, total: cards.length }) })),
       el("p", { class: "poll-host-question", text: cards[i]?.text || "" }),
       labels && el("p", { class: "count count-active", text: t("modwall.guesses", { count: total }) }),
-      labels && (act.answer === 0 || act.answer === 1
-        ? el("p", { class: "hint", text: t("modwall.answerShown", { label: labels[act.answer], pct: percent(counts[act.answer], total) }) })
-        : el("button", {
-          type: "button", class: "button", text: t("modwall.reveal"),
-          onclick: () => inbox[act.spotlight] && change({ answer: inbox[act.spotlight].label })
-        })),
-      el("div", { class: "button-row" },
-        el("button", { type: "button", class: "button button-small button-secondary", text: t("poll.back"), disabled: i <= 0, onclick: () => go(i - 1) }),
-        el("button", { type: "button", class: "button button-small", text: t("modwall.spotlightNext"), disabled: i < 0 || i + 1 >= cards.length, onclick: () => go(i + 1) }),
-        el("button", { type: "button", class: "button button-small button-secondary", text: t("modwall.spotlightStop"), onclick: () => change({ spotlight: null, answer: null }) })));
+      labels && answered && el("p", { class: "hint", text: t("modwall.answerShown", { label: labels[act.answer], pct: percent(counts[act.answer], total) }) }),
+      actions({
+        primary: labels && !answered
+          ? { text: t("modwall.reveal"), onclick: () => inbox[act.spotlight] && change({ answer: inbox[act.spotlight].label }) }
+          : i >= 0 && i + 1 < cards.length
+            ? { text: t("modwall.spotlightNext"), onclick: () => go(i + 1) }
+            : { text: t("modwall.spotlightStop"), onclick: () => change({ spotlight: null, answer: null }) },
+        secondary: [
+          { text: t("poll.back"), disabled: i <= 0, onclick: () => go(i - 1) },
+          labels && !answered && i >= 0 && i + 1 < cards.length && { text: t("modwall.spotlightNext"), onclick: () => go(i + 1) },
+          (i < 0 || i + 1 < cards.length || (labels && !answered)) && { text: t("modwall.spotlightStop"), onclick: () => change({ spotlight: null, answer: null }) }
+        ]
+      }));
   }
 
   function draw() {
@@ -163,31 +188,37 @@ function host({ el: root, code, activityId, activity }) {
     fill(root,
       el("h2", { text: t("modwall.name") }),
       el("p", { class: "poll-host-question", text: act.config?.prompt || "" }),
-      stateButtons(act, change),
-      el("p", { class: "count count-active", text: t("modwall.counts", { pending: pending.length, shown: shown.length }) }),
-      act.state !== "writing" && el("p", { class: "count", text: t("wall.voters", { count: voterCount(votes) }) }),
+      el("p", { class: "count count-active" }, [
+        t("modwall.counts", { pending: pending.length, shown: shown.length }),
+        act.state !== "writing" ? t("wall.voters", { count: voterCount(votes) }) : null
+      ].filter(Boolean).join(" · ")),
+      // The spotlight (when on) takes the big button; otherwise writing → voting → results.
+      act.spotlight ? spotlightSection() : stateButtons(act, change, end),
 
-      el("h3", { text: t("modwall.pendingTitle") }),
-      el("p", { class: "hint", text: t("modwall.pendingHint") }),
-      pending.length === 0 && el("p", { class: "hint", text: t("modwall.noPending") }),
-      el("ul", { class: "host-cards" }, pending.map((card) => hostCard(card, false,
-        el("button", { type: "button", class: "button button-small", text: t("modwall.approve"), onclick: () => approve(card.pid) }),
-        el("button", { type: "button", class: "button button-small button-secondary", text: t("wall.hide"), onclick: () => hide(card.pid) })))),
+      // Waiting for approval: amber, always open, right under the buttons.
+      el("div", { class: "pending-box" },
+        withHelp(el("h3", {}, t("modwall.pendingTitle"), " ", badge(String(pending.length), pending.length ? "pending" : "done")), t("modwall.pendingHint")),
+        pending.length === 0 && el("p", { class: "hint", text: t("modwall.noPending") }),
+        el("ul", { class: "host-cards" }, pending.map((card) => hostCard({ ...card, className: "host-card-pending" }, false,
+          el("button", { type: "button", class: "button button-small", text: t("modwall.approve"), onclick: () => approve(card.pid) }),
+          el("button", { type: "button", class: "button button-small button-secondary", text: t("wall.hide"), onclick: () => hide(card.pid) }))))),
 
-      spotlightSection(),
+      !act.spotlight && spotlightSection(),
 
-      el("h3", { text: t("modwall.shownTitle") }),
-      shown.length === 0 && el("p", { class: "hint", text: t("wall.noCards") }),
-      el("ul", { class: "host-cards" }, shown.map((card) => hostCard(card, byVotes,
-        el("button", {
-          type: "button", class: "button button-small button-secondary", text: t("modwall.spotlightThis"),
-          disabled: act.spotlight === card.pid, onclick: () => change({ spotlight: card.pid, answer: null })
-        }),
-        el("button", { type: "button", class: "button button-small button-secondary", text: t("wall.hide"), onclick: () => hide(card.pid) })))),
+      fold("modwall-shown", t("modwall.shownTitle"), [
+        shown.length === 0 && el("p", { class: "hint", text: t("wall.noCards") }),
+        el("ul", { class: "host-cards" }, shown.map((card) => hostCard({ ...card, className: "host-card-shown" }, byVotes,
+          el("button", {
+            type: "button", class: "button button-small button-secondary", text: t("modwall.spotlightThis"),
+            disabled: act.spotlight === card.pid, onclick: () => change({ spotlight: card.pid, answer: null })
+          }),
+          el("button", { type: "button", class: "button button-small button-secondary", text: t("wall.hide"), onclick: () => hide(card.pid) }))))
+      ], { className: "fold-inner", badge: badge(String(shown.length), "live") }),
 
-      hiddenCards.length > 0 && el("h3", { text: t("modwall.hiddenTitle") }),
-      el("ul", { class: "host-cards" }, hiddenCards.map((card) => hostCard({ ...card, hidden: true }, false,
-        el("button", { type: "button", class: "button button-small button-secondary", text: t("modwall.approve"), onclick: () => approve(card.pid) })))));
+      hiddenCards.length > 0 && fold("modwall-hidden", t("modwall.hiddenTitle"), [
+        el("ul", { class: "host-cards" }, hiddenCards.map((card) => hostCard({ ...card, hidden: true }, false,
+          el("button", { type: "button", class: "button button-small button-secondary", text: t("modwall.approve"), onclick: () => approve(card.pid) }))))
+      ], { className: "fold-inner", badge: badge(String(hiddenCards.length), "done") }));
   }
 
   const onError = (err) => console.error(err);
@@ -360,7 +391,10 @@ function screen(ctx) {
 
 export default {
   name: "modwall.name",
+  short: "modwall.short",
+  icon: "🛡️",
   setup,
+  watchPending,
   describe,
   host,
   participant,

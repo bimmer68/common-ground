@@ -1,0 +1,15 @@
+{
+  "name": "common-ground-tests",
+  "private": true,
+  "type": "module",
+  "description": "Tests for Common Ground: database rules and the three screens in a headless browser, on the Firebase emulator.",
+  "scripts": {
+    "test": "firebase emulators:exec --project demo-common-ground --only auth,database \"node --test --test-concurrency=1 --test-timeout=180000 *.test.mjs\""
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "3.0.4",
+    "firebase": "10.12.2",
+    "firebase-tools": "15.34.1",
+    "playwright": "1.63.0"
+  }
+}
