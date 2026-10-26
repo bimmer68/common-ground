@@ -9,8 +9,9 @@
 //
 // The projector shows only the number of answers until the facilitator
 // clicks Reveal. Then it shows the average before → after for each statement.
-import { t } from "../i18n.js";
+import { t, tEn } from "../i18n.js";
 import { el } from "../dom.js";
+import { actions, badge, withHelp } from "../host-ui.js";
 import { watchMemberCount } from "../session.js";
 import { saveResponse, getOwnResponse, watchResponses, updateActivity } from "../activity-store.js";
 
@@ -46,10 +47,12 @@ function setup({ el: root, onStart, onCancel }) {
   const fields = Array.from({ length: STATEMENT_COUNT }, (_, i) =>
     el("textarea", { id: `measure-s${i}`, maxlength: STATEMENT_MAX, rows: 3 }));
   const error = el("p", { class: "error", role: "alert", hidden: true });
-  const start = el("button", { type: "button", class: "button", text: t("measure.startBefore") });
+  const start = el("button", { type: "button", class: "button button-primary", text: t("measure.startBefore") });
 
+  // The statements go on the projector and the phones, so they are always
+  // filled in English, whatever language the facilitator's page is in.
   function fillPreset() {
-    fields.forEach((field, i) => { field.value = t(`measure.preset.${select.value}.${i + 1}`); });
+    fields.forEach((field, i) => { field.value = tEn(`measure.preset.${select.value}.${i + 1}`); });
   }
   select.addEventListener("change", fillPreset);
   fillPreset();
@@ -74,17 +77,17 @@ function setup({ el: root, onStart, onCancel }) {
   });
 
   root.replaceChildren(
-    el("h2", { text: t("measure.name") }),
+    withHelp(el("h2", { text: t("measure.name") }), t("measure.setupHint")),
     el("label", { for: "measure-preset", text: t("measure.preset") }),
     select,
     ...fields.flatMap((field, i) => [
       el("label", { for: field.id, text: t("measure.statementLabel", { n: i + 1 }) }),
       field
     ]),
-    el("p", { class: "hint", text: t("measure.setupHint") }),
-    error,
-    start,
-    el("button", { type: "button", class: "button button-secondary", text: t("common.cancel"), onclick: onCancel })
+    el("div", { class: "setup-start" },
+      error,
+      start,
+      el("button", { type: "button", class: "button button-secondary", text: t("common.cancel"), onclick: onCancel }))
   );
 }
 
@@ -108,34 +111,33 @@ function host({ el: root, code, activityId, activity }) {
     }
   }
 
+  // The big button follows the workshop: Before → (reveal) → After → reveal.
+  //   Before, hidden:   [Start After]          small: Reveal results
+  //   After, hidden:    [Reveal results]       small: Back to Before
+  //   After, revealed:  [Hide results]         small: Back to Before
+  // (Before, revealed: [Start After], small: Hide results.)
   function draw() {
-    const buttons = [];
-    if (act.phase === "before") {
-      buttons.push(el("button", {
-        type: "button", class: "button", text: t("measure.startAfter"),
-        onclick: () => { if (confirm(t("measure.confirmAfter"))) change({ phase: "after", revealed: false }); }
-      }));
-    } else {
-      buttons.push(el("button", {
-        type: "button", class: "button button-secondary", text: t("measure.backToBefore"),
-        onclick: () => change({ phase: "before", revealed: false })
-      }));
-    }
-    buttons.push(el("button", {
-      type: "button", class: "button", text: t(act.revealed ? "measure.hide" : "measure.reveal"),
-      onclick: () => change({ revealed: !act.revealed })
-    }));
+    const startAfter = {
+      text: t("measure.startAfter"),
+      onclick: () => { if (confirm(t("measure.confirmAfter"))) change({ phase: "after", revealed: false }); }
+    };
+    const toggleReveal = { text: t(act.revealed ? "measure.hide" : "measure.reveal"), onclick: () => change({ revealed: !act.revealed }) };
+    const backToBefore = { text: t("measure.backToBefore"), onclick: () => change({ phase: "before", revealed: false }) };
+    const buttons = act.phase === "before"
+      ? { primary: startAfter, secondary: [toggleReveal] }
+      : { primary: toggleReveal, secondary: [backToBefore] };
 
     root.replaceChildren(
       el("h2", { text: t("measure.name") }),
-      el("p", { class: "phase-now", text: t("measure.phaseNow", { phase: phaseName(act.phase) }) }),
+      el("div", { class: "host-state" },
+        el("span", { class: "phase-now", text: t("measure.phaseNow", { phase: phaseName(act.phase) }) }),
+        badge(t(act.revealed ? "measure.badgeRevealed" : "measure.badgeHidden"), act.revealed ? "live" : "info")),
       el("ol", { class: "statement-list" }, statementsOf(act).map((s) => el("li", { text: s }))),
       ...PHASES.map((phase) => el("p", {
         class: phase === act.phase ? "count count-active" : "count",
         text: t("measure.counts", { phase: phaseName(phase), count: countOf(responses, phase), total: members })
       })),
-      el("p", { class: "hint", text: t(act.revealed ? "measure.revealedNote" : "measure.hiddenNote") }),
-      ...buttons
+      actions(buttons)
     );
   }
 
@@ -301,7 +303,9 @@ function report({ activity, responses }) {
 }
 
 export default {
-  name: "measure.name", // i18n key for the "start new activity" button
+  name: "measure.name",   // i18n key: the name of the type
+  short: "measure.short", // i18n key: short name for the tile on the facilitator's phone
+  icon: "📏",
   setup,
   describe,
   host,

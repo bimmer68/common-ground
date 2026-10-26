@@ -19,6 +19,7 @@
 import { db, ref, set, update, onValue, serverTimestamp, serverNow } from "./firebase.js";
 import { el } from "./dom.js";
 import { t } from "./i18n.js";
+import { withHelp } from "./host-ui.js";
 
 export const PRESETS = [60, 90, 120];
 export const MIN_SECONDS = 5;
@@ -107,12 +108,16 @@ export function timerDisplay({ el: root, code }) {
 }
 
 // ---------- Facilitator: start / stop ----------
-export function timerControls({ el: root, code, onError }) {
+// onStatus(text or null): the time left as text ("1:24", "Time's up!") while
+// a timer is visible, null when there is none. The facilitator's page shows
+// it on the timer button in the bar at the top.
+export function timerControls({ el: root, code, onError, onStatus = () => {} }) {
   let timer = null;
+  let lastStatus;
 
   const display = el("p", { class: "timer-left", hidden: true });
   const stop = el("button", {
-    type: "button", class: "button button-secondary", text: t("timer.stop"), hidden: true,
+    type: "button", class: "button button-small button-danger", text: t("timer.stop"), hidden: true,
     onclick: () => stopTimer(code).catch(fail)
   });
   const custom = el("input", {
@@ -149,9 +154,10 @@ export function timerControls({ el: root, code, onError }) {
   }
 
   root.replaceChildren(
-    el("h2", { text: t("timer.title") }),
+    withHelp(el("h2", { text: t("timer.title") }), t("timer.hint")),
     display,
-    el("div", { class: "button-row" }, PRESETS.map((seconds) => el("button", {
+    stop,
+    el("div", { class: "button-row timer-presets" }, PRESETS.map((seconds) => el("button", {
       type: "button", class: "button button-small", text: formatTime(seconds * 1000),
       onclick: () => start(seconds)
     }))),
@@ -160,11 +166,8 @@ export function timerControls({ el: root, code, onError }) {
       el("div", { class: "inline-row" },
         custom,
         el("button", { type: "submit", class: "button button-small", text: t("timer.start") }))),
-    el("label", { class: "check" }, big, el("span", { text: t("timer.bigLabel") })),
-    el("p", { class: "hint", text: t("timer.bigHint") }),
-    error,
-    stop,
-    el("p", { class: "hint", text: t("timer.hint") })
+    withHelp(el("label", { class: "check" }, big, el("span", { text: t("timer.bigLabel") })), t("timer.bigHint")),
+    error
   );
 
   function draw() {
@@ -173,7 +176,12 @@ export function timerControls({ el: root, code, onError }) {
     display.hidden = !visible;
     stop.hidden = left == null;
     stop.textContent = t(left != null && left <= 0 ? "timer.hide" : "timer.stop");
-    if (visible) display.textContent = left <= 0 ? t("timer.done") : formatTime(left);
+    const text = visible ? (left <= 0 ? t("timer.done") : formatTime(left)) : null;
+    if (text != null) display.textContent = text;
+    if (text !== lastStatus) {
+      lastStatus = text;
+      onStatus(text);
+    }
   }
 
   const stopWatch = watchTimer(code, (v) => {
@@ -182,5 +190,5 @@ export function timerControls({ el: root, code, onError }) {
     draw();
   }, onError);
   const stopTicker = ticker(draw);
-  return () => { stopWatch(); stopTicker(); root.replaceChildren(); };
+  return () => { stopWatch(); stopTicker(); root.replaceChildren(); onStatus(null); };
 }

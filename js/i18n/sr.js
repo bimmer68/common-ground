@@ -105,5 +105,10 @@ export default {
   "ground.lookAtBoard": "Pogledaj ekran: ovo je ono što cela grupa može da potpiše.",
   "ground.choice.sign": "Mogu da potpišem",
   "ground.choice.change": "Uz izmenu",
-  "ground.choice.cant": "Ne mogu da potpišem"
+  "ground.choice.cant": "Ne mogu da potpišem",
+  "ground.amendLabel": "Tvoja izmena (nije obavezno)",
+  "ground.amendHint": "Napiši kako bi tvrdnju trebalo promeniti da bi mogao/la da je potpišeš. Vidi je samo facilitator, bez tvog imena.",
+  "ground.amendSend": "Pošalji izmenu",
+  "ground.amendSaved": "Poslato facilitatoru. Možeš da je menjaš dok je glasanje otvoreno.",
+  "ground.amendConfirmDelete": "Obrisati tvoj predlog izmene?"
 };

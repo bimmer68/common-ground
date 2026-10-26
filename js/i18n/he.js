@@ -105,5 +105,10 @@ export default {
   "ground.lookAtBoard": "כדאי להסתכל על המסך: על זה כל הקבוצה יכולה לחתום.",
   "ground.choice.sign": "אני יכול/ה לחתום",
   "ground.choice.change": "עם שינוי",
-  "ground.choice.cant": "אני לא יכול/ה לחתום"
+  "ground.choice.cant": "אני לא יכול/ה לחתום",
+  "ground.amendLabel": "השינוי שלך (לא חובה)",
+  "ground.amendHint": "כתבו איך צריך לשנות את המשפט כדי שתוכלו לחתום עליו. רק המנחה רואה אותו, בלי השם שלכם.",
+  "ground.amendSend": "שליחת השינוי",
+  "ground.amendSaved": "נשלח למנחה. אפשר לשנות אותו כל עוד ההצבעה פתוחה.",
+  "ground.amendConfirmDelete": "למחוק את השינוי שהצעתם?"
 };

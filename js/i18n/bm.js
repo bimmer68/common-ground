@@ -106,5 +106,10 @@ export default {
   "ground.lookAtBoard": "I ɲɛ da ɛkaran kan: jɛkulu bɛɛ bɛ se ka bolonɔ bila nin kan.",
   "ground.choice.sign": "N bɛ se ka bolonɔ bila a kan",
   "ground.choice.change": "Ni yɛlɛmali dɔ ye",
-  "ground.choice.cant": "N tɛ se ka bolonɔ bila a kan"
+  "ground.choice.cant": "N tɛ se ka bolonɔ bila a kan",
+  "ground.amendLabel": "I ka yɛlɛmali (n'i b'a fɛ)",
+  "ground.amendHint": "A sɛbɛn cogo min na kuma in ka kan ka yɛlɛma walasa i ka se ka i bolonɔ bila a kan. Ɲɛmɔgɔ dɔrɔn de b'a ye, i tɔgɔ tɛ a la.",
+  "ground.amendSend": "I ka yɛlɛmali ci",
+  "ground.amendSaved": "A cira ɲɛmɔgɔ ma. I bɛ se k'a yɛlɛma ni kalata ma datugu.",
+  "ground.amendConfirmDelete": "I ka yɛlɛmali jɔsi wa?"
 };

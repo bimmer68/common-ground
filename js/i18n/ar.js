@@ -105,5 +105,10 @@ export default {
   "ground.lookAtBoard": "انظر إلى الشاشة: هذا ما يمكن للمجموعة كلها أن توقّع عليه.",
   "ground.choice.sign": "يمكنني التوقيع",
   "ground.choice.change": "مع تعديل",
-  "ground.choice.cant": "لا يمكنني التوقيع"
+  "ground.choice.cant": "لا يمكنني التوقيع",
+  "ground.amendLabel": "تعديلك (اختياري)",
+  "ground.amendHint": "اكتب كيف يجب تغيير العبارة لتتمكن من التوقيع عليها. لا يراه إلا الميسّر، ومن دون اسمك.",
+  "ground.amendSend": "أرسل التعديل",
+  "ground.amendSaved": "أُرسل إلى الميسّر. يمكنك تغييره ما دام التصويت مفتوحًا.",
+  "ground.amendConfirmDelete": "هل تريد حذف التعديل الذي اقترحته؟"
 };

@@ -35,6 +35,9 @@
                   ".validate": "$o.matches(/^[0-5]$/) && newData.isString() && newData.val().length >= 1 && newData.val().length <= 60"
                 }
               },
+              "question": {
+                ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 200"
+              },
               "tag": {
                 ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 30"
               },
@@ -313,6 +316,42 @@
                 "$uid": {
                   ".write": "auth != null && auth.uid === $uid && root.child('sessions').child($code).child('members').child(auth.uid).val() === true && root.child('sessions').child($code).child('current').child('activityId').val() === $aid && root.child('sessions').child($code).child('activities').child($aid).child('type').val() === 'commonGround' && root.child('sessions').child($code).child('activities').child($aid).child('state').val() === 'voting' && root.child('sessions').child($code).child('activities').child($aid).child('ballot').child('pid').val() === $pid && root.child('sessions').child($code).child('activities').child($aid).child('ballot').child('v').val() === $v",
                   ".validate": "newData.val() === 0 || newData.val() === 1 || newData.val() === 2"
+                }
+              }
+            }
+          }
+        },
+        "amends": {
+          "$aid": {
+            ".read": "auth != null && root.child('sessions').child($code).child('meta').child('hostUid').val() === auth.uid",
+            "$pid": {
+              "$v": {
+                "$key": {
+                  ".read": "auth != null && root.child('sessions').child($code).child('myAmends').child($aid).child($pid).child($v).child(auth.uid).val() === $key",
+                  ".write": "auth != null && root.child('sessions').child($code).child('members').child(auth.uid).val() === true && root.child('sessions').child($code).child('current').child('activityId').val() === $aid && root.child('sessions').child($code).child('activities').child($aid).child('type').val() === 'commonGround' && root.child('sessions').child($code).child('activities').child($aid).child('state').val() === 'voting' && root.child('sessions').child($code).child('activities').child($aid).child('ballot').child('pid').val() === $pid && root.child('sessions').child($code).child('activities').child($aid).child('ballot').child('v').val() === $v && (root.child('sessions').child($code).child('myAmends').child($aid).child($pid).child($v).child(auth.uid).val() === $key || newData.parent().parent().parent().parent().parent().child('myAmends').child($aid).child($pid).child($v).child(auth.uid).val() === $key) && (!newData.exists() || newData.parent().parent().parent().parent().parent().child('signs').child($aid).child($pid).child($v).child(auth.uid).val() === 1)",
+                  ".validate": "newData.hasChildren(['text', 'at'])",
+                  "text": {
+                    ".validate": "newData.isString() && newData.val().length >= 1 && newData.val().length <= 200"
+                  },
+                  "at": {
+                    ".validate": "newData.isNumber() && newData.val() <= now"
+                  },
+                  "$other": {
+                    ".validate": false
+                  }
+                }
+              }
+            }
+          }
+        },
+        "myAmends": {
+          "$aid": {
+            "$pid": {
+              "$v": {
+                "$uid": {
+                  ".read": "auth != null && auth.uid === $uid",
+                  ".write": "auth.uid === $uid && auth != null && root.child('sessions').child($code).child('members').child(auth.uid).val() === true && root.child('sessions').child($code).child('current').child('activityId').val() === $aid && root.child('sessions').child($code).child('activities').child($aid).child('type').val() === 'commonGround' && root.child('sessions').child($code).child('activities').child($aid).child('state').val() === 'voting' && root.child('sessions').child($code).child('activities').child($aid).child('ballot').child('pid').val() === $pid && root.child('sessions').child($code).child('activities').child($aid).child('ballot').child('v').val() === $v && (!data.exists() || !newData.exists()) && (newData.exists() || !newData.parent().parent().parent().parent().parent().child('amends').child($aid).child($pid).child($v).child(data.val()).exists())",
+                  ".validate": "newData.isString() && newData.val().matches(/^[-_a-zA-Z0-9]{20}$/) && !root.child('sessions').child($code).child('amends').child($aid).child($pid).child($v).child(newData.val()).exists()"
                 }
               }
             }

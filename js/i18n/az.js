@@ -105,5 +105,10 @@ export default {
   "ground.lookAtBoard": "Ekrana bax: bütün qrupun imza ata biləcəyi budur.",
   "ground.choice.sign": "İmza ata bilərəm",
   "ground.choice.change": "Dəyişikliklə",
-  "ground.choice.cant": "İmza ata bilmərəm"
+  "ground.choice.cant": "İmza ata bilmərəm",
+  "ground.amendLabel": "Sizin dəyişikliyiniz (istəyə bağlı)",
+  "ground.amendHint": "Bəyanatı imzalaya bilməyiniz üçün onun necə dəyişməli olduğunu yazın. Onu yalnız fasilitator görür, adınız olmadan.",
+  "ground.amendSend": "Dəyişikliyi göndər",
+  "ground.amendSaved": "Fasilitatora göndərildi. Səsvermə açıq olduqca onu dəyişə bilərsiniz.",
+  "ground.amendConfirmDelete": "Təklif etdiyiniz dəyişiklik silinsin?"
 };

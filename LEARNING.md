@@ -383,3 +383,56 @@ Tekst se nikad ne prevodi, samo se prikazuje kako je napisan.
 
 ### Testiranje bez interneta (lažni Firebase)
 U okruženju gdje smo testirali, Firebase server nije bio dostupan. Zato je headless Chromium umjesto pravog Firebasea dobio mali "lažni" Firebase u memoriji (isti nazivi funkcija: `ref`, `get`, `onValue`…). Tako smo otvorili ekran učesnika u svih 13 jezika za svaku aktivnost i provjerili: nigdje se ne vidi ključ umjesto teksta, arapski i hebrejski su okrenuti, i u bazu se upisuje samo odgovor (npr. `[3, 5]`), nikad jezik.
+
+---
+
+## Redizajn facilitator ekrana i popravke
+
+### `position: sticky` (traka koja ne odlazi)
+Traka na vrhu facilitatorovog ekrana (kod, 👥 broj, šta je na projektoru, ⏱) ima `position: sticky; top: 0` (`css/app.css`, `.host-bar`). Dok se ne skrola, ponaša se kao običan element; kad bi trebala otići gore, "zalijepi" se za vrh ekrana. Razlika od `position: fixed` (tajmer na projektoru): sticky element i dalje zauzima svoje mjesto u stranici, pa ništa ne pokriva.
+
+### Jedno glavno dugme (`actions()` u `js/host-ui.js`)
+Svaka aktivnost na facilitatorovom mobitelu sada ima **jedno** veliko dugme za sljedeći korak ("Otvori glasanje", "Sljedeće pitanje"…) i manja dugmad ispod (Nazad, Idi na pitanje…). Moduli to ne crtaju svaki na svoj način, nego pozovu isti pomoćnik:
+```js
+actions({ primary: { text: "Next question", onclick: … }, secondary: [{ text: "Back", … }] })
+```
+Tako izgledaju isto u svakoj aktivnosti i facilitator za 2 sekunde nađe sljedeći klik.
+
+### `<details>` i `<summary>` (harmonika / accordion)
+HTML ima ugrađen element koji se otvara i zatvara na dodir, bez JavaScripta:
+```html
+<details class="fold"><summary>Host PIN</summary> … </details>
+```
+PIN, linkovi, izvještaj, lista ranijih aktivnosti, šabloni i "Više opcija" su takve sklopljene sekcije, pa ne guraju glavne kontrole dolje. Kad se dio ekrana ponovo nacrta (npr. stigne novi glas), `fold()` u `js/host-ui.js` zapamti da li je sekcija bila otvorena, pa se ne zatvori sama.
+
+### CSS varijable po tipu (`--type`)
+Svaki tip aktivnosti ima svoju boju, upisanu jednom: `.type-poll { --type: #1d4ed8; }`. Pločica, kartica "Sada" i ikonica u listi samo kažu `border-color: var(--type)`. Nova boja = jedan red u CSS-u. Stanja imaju svoje boje (oznake / "badge"): zelena = na projektoru, plava = samo na mobitelu, narandžasta = čeka odobrenje, siva = završeno.
+
+### Kontrast
+Tekst mora biti dovoljno tamniji (ili svjetliji) od pozadine da se čita i na suncu ili sa slabim vidom. Pravilo (WCAG) je odnos najmanje **4,5 : 1**. Zato npr. narandžasta oznaka "čeka odobrenje" ima tamnosmeđi tekst (#78350f) na svijetložutoj pozadini, a ne žuti tekst na bijelom.
+
+### "Otvori" i "Na projektor": jedna aktivnost, dva pogleda
+Prije je postojao samo `current` u bazi: šta je na projektoru, to je i na facilitatorovom mobitelu. Sada facilitatorov mobitel ima i svoj, **lokalni** izbor (`previewId` u `js/host.js`), koji ne ide u bazu. "Otvori" promijeni samo `previewId` → projektor i učesnici ne primijete ništa. "Na projektor" upiše `current` u bazu → svi se prebace. Da bi ovo radilo, `js/activity-loop.js` sada ima i `activityView()`: nacrtaj **bilo koju** aktivnost po id-u, ne samo trenutnu.
+
+### Šta smije biti na drugom jeziku, a šta ne (`tEn`)
+Facilitator može raditi na bosanskom ili italijanskom, ali projektor je na engleskom. Sve što facilitator samo **vidi** ide kroz `t()` (njegov jezik). Ali tekst koji se **sačuva i pokaže na projektoru** (npr. ponuđene tvrdnje mjerenja, oznake "I believe this") ide kroz `tEn()` – uvijek engleski. Isto za Compare: u bazu se upiše engleski tekst opcije ("Yes"), a facilitator u meniju vidi "Da".
+
+### Utrka (race condition) i "zadnji izbor pobjeđuje"
+Kad učesnik izabere jezik, mobitel prvo preuzme fajl tog jezika, a to traje. Ako izabere ruski pa brzo arapski, arapski fajl može stići **prije** ruskog; stari kod bi onda kad stigne ruski prebacio stranicu na ruski, iako meni pokazuje arapski. To se zove utrka: rezultat zavisi od toga ko stigne prvi. Popravka u `setLanguage()` (`js/i18n.js`): svaki izbor dobije redni broj; kad fajl stigne, primijeni se samo ako je to još uvijek **najnoviji** izbor.
+
+### Ćirilica iz latinice
+Srpski na ćirilici (`js/i18n/sr-cyrl.js`) napravljen je iz latinice slovo po slovo (lj → љ, nj → њ, dž → џ, č → ч…). Dvije stvari ostaju latinicom: `{count}` i slične rupe (to su imena, ne tekst) i primjer koda sesije "ABCD", jer se kod upisuje latinicom.
+
+### Tvrdnja i pitanje za glasanje (polje koje može nedostajati)
+Pitanje u brzom glasanju sada ima i `question`. Stari šabloni (npr. CNQXHL) ga nemaju, pa kod svuda kaže "pitanje, a ako ga nema – tvrdnja": `question.question || question.text`. Pravila baze za šablone dobila su jedno novo dozvoljeno polje (`question`), a stara ostaju ista, pa stari šabloni i dalje prolaze provjeru.
+
+### Prijedlog izmjene: anonimno kao zid
+Ko glasa "With a change" može napisati izmjenu. U bazi je urađeno isto kao tekstovi na zidu:
+```
+amends/{id}/{pid}/v0/{aid}     { text, at }   ← tekst BEZ autora, čita samo facilitator (i autor svoj)
+myAmends/{id}/{pid}/v0/{uid}   aid            ← "ovo je moje", čita samo taj uid
+```
+Pravila puštaju upis samo dok se o toj verziji glasa i samo onome čiji je glas baš "With a change" (`signs/…/{uid} === 1`). Kad osoba promijeni glas, izmjena se briše **u istom koraku** kao i glas.
+
+### Automatski testovi (`tests/`)
+Umjesto da sve klikamo rukom, testovi to rade sami: `npm test` u folderu `tests` pokrene Firebase emulator, provjeri pravila baze (npr. projektor ne smije pročitati prijedloge izmjena), provjeri prevode (da nijedan jezik nema rupu `{count}` koje nema engleski) i otvori aplikaciju u headless Chromiumu: facilitator na 375 px, projektor, dva učesnika. Test npr. klikne "Otvori" na moderisanom zidu, odobri tekst i provjeri da projektor **i dalje** pokazuje oblak riječi. Ako neko kasnije nešto pokvari, test to kaže odmah.

@@ -7,14 +7,21 @@
 //
 // Never in the report: nicknames (they are not in the database), languages,
 // uids, texts that were not approved or were hidden.
+//
+// The report itself can be in English or Italian (menu at the top, not
+// printed). Only the report's own texts change; what people wrote stays as
+// it was written.
 import { ensureSignedIn } from "./firebase.js";
-import { t, applyTranslations } from "./i18n.js";
+import { t, applyTranslations, setLanguage, currentLanguage } from "./i18n.js";
+import { REPORT_LANGUAGES } from "./i18n/languages.js";
 import { el, fill } from "./dom.js";
+import * as storage from "./storage.js";
 import { codeFromUrl, getSessionMeta } from "./session.js";
 import { loadReportData } from "./report-store.js";
 import { activityTypes } from "./activities/index.js";
 
 const $ = (id) => document.getElementById(id);
+const LANGUAGE_KEY = "reportLanguage"; // "en" | "it" – only on this device
 
 function showMessage(text) {
   $("loading").hidden = true;
@@ -22,8 +29,26 @@ function showMessage(text) {
   $("message").hidden = false;
 }
 
-// "27 October 2026"
-const formatDate = (ms) => (ms ? new Intl.DateTimeFormat("en-GB", { dateStyle: "long" }).format(new Date(ms)) : t("measure.noValue"));
+// "27 October 2026" / "27 ottobre 2026"
+const formatDate = (ms) => (ms
+  ? new Intl.DateTimeFormat(currentLanguage() === "en" ? "en-GB" : currentLanguage(), { dateStyle: "long" }).format(new Date(ms))
+  : t("measure.noValue"));
+
+// The language menu (not printed). Choosing a language draws the report again.
+function languageMenu(code, data) {
+  return el("div", { class: "report-language" },
+    el("label", { for: "report-language", text: t("report.language") }),
+    el("select", {
+      id: "report-language",
+      onchange: async (event) => {
+        storage.save(LANGUAGE_KEY, event.target.value);
+        await setLanguage(event.target.value, REPORT_LANGUAGES);
+        applyTranslations();
+        document.title = t("report.titleWithCode", { code });
+        draw(code, data);
+      }
+    }, REPORT_LANGUAGES.map((lang) => el("option", { value: lang.code, lang: lang.code, text: lang.name, selected: lang.code === currentLanguage() }))));
+}
 
 // Activities as a list, oldest first.
 function activityList(activities) {
@@ -65,6 +90,7 @@ function draw(code, data) {
         el("div", {}, el("dt", { text: t("report.activities") }), el("dd", { text: String(activities.length) })),
         el("div", {}, el("dt", { text: t("report.session") }), el("dd", { text: code }))),
       el("div", { class: "report-actions" },
+        languageMenu(code, data),
         el("button", { type: "button", class: "report-button", text: t("report.print"), onclick: () => window.print() }),
         el("p", { class: "report-hint", text: t("report.printHint") }))),
     sections.length ? sections : el("p", { class: "report-empty", text: t("report.noActivities") }),
@@ -75,6 +101,7 @@ function draw(code, data) {
 }
 
 async function start() {
+  await setLanguage(storage.load(LANGUAGE_KEY), REPORT_LANGUAGES);
   applyTranslations();
   const code = codeFromUrl();
   if (!code) return showMessage(t("report.noCode"));
